@@ -97,9 +97,8 @@ if "chat_history" not in st.session_state:
 with st.sidebar:
     st.markdown("### 👨‍🏫 **शिक्षक प्रोफाईल**")
     st.markdown("""
-    **नाव:** प्रा. राहुल सावंत (उदा.)  
-    **पद:** Secondary School Teacher & AI Educator  
-    **अनुभव:** १०+ वर्षे शिक्षण क्षेत्रात  
+    **नाव:**  ऋषिकेश रसिक महेश चव्हाण    
+    **पद:** Secondary School Teacher & AI Educator    
     **विषय:** विज्ञान, गणित आणि Artificial Intelligence (AI)
     """)
     st.divider()
@@ -157,7 +156,7 @@ if selected_page == "🏠 मुख्य पान (Home)":
         
     st.write("")
     st.subheader("📢 ताज्या घडामोडी व सूचना (Notice Board)")
-    st.info("📌 **नवीन बॅच:** रविवारपासून 'शालेय विद्यार्थ्यांसाठी AI ची तोंडओळख' हा मोफत ऑनलाइन कोर्स सुरू होत आहे!")
+    st.info("📌 **नवीन बॅच:** रविवारपासून ' लवकरच ")
 
 elif selected_page == "📚 शालेय अभ्यासक्रम (Subjects)":
     st.header("📚 शालेय अभ्यासक्रम व साहित्य")
