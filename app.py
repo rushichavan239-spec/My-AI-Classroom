@@ -298,73 +298,33 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
             with tab1:
                 st.subheader("🧪 धडा ३: रासायनिक अभिक्रिया आणि समीकरणे (Chemical Reactions & Equations)")
                 st.markdown("""
-                रासायनिक अभिक्रियांचे प्रामु換えने **४ मुख्य प्रकार** असतात:
+                रासायनिक अभिक्रियांचे प्रामुख्याने **४ मुख्य प्रकार** असतात:
                 1. **➕ संयोग (Combination):** दोन किंवा अधिक अभिक्रियाकारकांपासून एकच उत्पादित तयार होते.
                 2. **💥 अपघटन (Decomposition):** एकाच अभिक्रियाकारकाचे विघटन होऊन दोन किंवा अधिक उत्पादिते मिळतात.
                 3. **🔄 विस्थापन (Displacement):** अधिक क्रियाशील मूलद्रव्य कमी क्रियाशील मूलद्रव्याला विस्थापित करते.
                 4. **🔀 दुहेरी विस्थापन (Double Displacement):** आयनांची अदलाबदल होऊन अवक्षेप तयार होतो.
                 """)
                 st.divider()
-                st.markdown("### 🎯 पाठ्यपुस्तकाबाहेरील रंजक २० अभिक्रियांचा विशेष सराव")
+                st.markdown("### 📝 रासायनिक अभिक्रियांचे प्रकार ओळखण्याचा सराव (प्रश्नपत्रिका)")
+                st.info("💡 **विद्यार्थ्यांसाठी सूचना:** खाली दिलेल्या २० रासायनिक अभिक्रियांचे काळजीपूर्वक निरीक्षण करा आणि अभिक्रिया कोणत्या प्रकारात मोडते (संयोग, अपघटन, विस्थापन की दुहेरी विस्थापन) ते आपल्या वहीत नोंदवा.")
                 
-                mode = st.radio("सराव मोड निवडा:", ["📋 सर्व २० अभिक्रियांची यादी व उत्तरे", "🎮 इंटरॅक्टिव्ह सोडवून पहा (Interactive Practice)"], horizontal=True)
+                # Render clean list of 20 reactions without revealing answers
+                col_rxn1, col_rxn2 = st.columns(2)
+                half = len(REACTIONS_DATA) // 2
                 
-                if mode == "📋 सर्व २० अभिक्रियांची यादी व उत्तरे":
-                    for r in REACTIONS_DATA:
-                        with st.expander(f"अभिक्रिया {r['id']}: ${r['reaction']}$"):
-                            st.markdown(f"**अभिक्रियेचा प्रकार:** `{r['type']}`")
-                            st.write(f"💡 **स्पष्टीकरण:** {r['explanation']}")
-                
-                elif mode == "🎮 इंटरॅक्टिव्ह सोडवून पहा (Interactive Practice)":
-                    total_rxns = len(REACTIONS_DATA)
-                    curr_idx = st.session_state.current_rxn_idx
-                    curr = REACTIONS_DATA[curr_idx]
+                with col_rxn1:
+                    for r in REACTIONS_DATA[:half]:
+                        with st.container(border=True):
+                            st.markdown(f"**प्रश्न {r['id']}.** खालील रासायनिक अभिक्रियेचा प्रकार ओळखा:")
+                            st.latex(r["reaction"])
+                            st.caption("प्रकार: ______________________________")
 
-                    # Sequential Progress indicator
-                    st.progress((curr_idx + 1) / total_rxns)
-                    st.markdown(f"#### 📍 **अभिक्रिया {curr_idx + 1} / {total_rxns}**")
-
-                    st.markdown("##### रासायनिक समीकरण:")
-                    st.latex(curr["reaction"])
-                    
-                    options_list = [
-                        "➕ संयोग अभिक्रिया (Combination)",
-                        "💥 अपघटन अभिक्रिया (Decomposition)",
-                        "🔄 विस्थापन अभिक्रिया (Displacement)",
-                        "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)"
-                    ]
-                    user_choice = st.radio(
-                        "ही कोणत्या प्रकारची रासायनिक अभिक्रिया आहे? 🤔",
-                        options_list,
-                        key=f"rxn_step_{curr_idx}"
-                    )
-                    
-                    col_chk, col_space = st.columns([1, 2])
-                    with col_chk:
-                        if st.button("उत्तर तपासा (Check Answer)", key=f"btn_check_{curr_idx}"):
-                            if user_choice == curr["type"]:
-                                st.success(f"🎉 **अगदी बरोबर!** हे `{curr['type']}` चे उदाहरण आहे.")
-                            else:
-                                st.error(f"❌ **चूक!** योग्य उत्तर आहे: `{curr['type']}`")
-                            st.info(f"💡 **स्पष्टीकरण:** {curr['explanation']}")
-
-                    st.divider()
-
-                    # Sequential Navigation Buttons (मागील, पुढील)
-                    nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
-                    with nav_col1:
-                        if st.button("⬅️ मागील अभिक्रिया", disabled=(curr_idx == 0)):
-                            st.session_state.current_rxn_idx -= 1
-                            st.rerun()
-                    with nav_col3:
-                        if curr_idx < total_rxns - 1:
-                            if st.button("➡️ पुढील अभिक्रिया"):
-                                st.session_state.current_rxn_idx += 1
-                                st.rerun()
-                        else:
-                            if st.button("🔄 पुन्हा सुरू करा"):
-                                st.session_state.current_rxn_idx = 0
-                                st.rerun()
+                with col_rxn2:
+                    for r in REACTIONS_DATA[half:]:
+                        with st.container(border=True):
+                            st.markdown(f"**प्रश्न {r['id']}.** खालील रासायनिक अभिक्रियेचा प्रकार ओळखा:")
+                            st.latex(r["reaction"])
+                            st.caption("प्रकार: ______________________________")
 
             with tab2:
                 st.subheader("🪐 धडा १: गुरुत्वाकर्षण (Gravitation) - महत्त्वाचे मुद्दे")
