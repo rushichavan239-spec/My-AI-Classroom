@@ -405,9 +405,9 @@ elif selected_page == "📬 शंका विचारा (Doubt Box)":
 # -------------------------------------------------------------
 elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher Admin) 🔐":
     st.header("📊 शिक्षक नियंत्रण कक्ष (Teacher Admin Dashboard)")
-    st.write("विद्यार्थ्यांची उपस्थिती, लॉगिन रेकॉर्ड आणि विचारलेल्या शंकांचे विश्लेषण.")
+    st.write("विद्यार्थ्यांची उपस्थिती, लॉगिन रेकॉर्ड, रासायनिक अभिक्रियांचे गुण आणि शंकांचे विश्लेषण.")
 
-    # Password Protection for Teacher (Default password hint removed)
+    # Password Protection for Teacher
     teacher_password = st.text_input("🔑 शिक्षकांचा गुप्त पासवर्ड टाका (Teacher PIN):", type="password")
     
     if teacher_password == "gurukul123":
@@ -415,33 +415,44 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
         st.divider()
 
         # Key Metrics Row
-        kpi1, kpi2, kpi3 = st.columns(3)
+        kpi1, kpi2, kpi3, kpi4 = st.columns(4)
         with kpi1:
             st.markdown(f"""
             <div class="kpi-card">
                 <div class="kpi-num">{len(st.session_state.student_logins)}</div>
-                <div class="kpi-title">एकूण नोंदणीकृत / लॉगिन विद्यार्थी</div>
+                <div class="kpi-title">लॉगिन विद्यार्थी</div>
             </div>
             """, unsafe_allow_html=True)
         with kpi2:
             st.markdown(f"""
             <div class="kpi-card">
-                <div class="kpi-num">{len(st.session_state.doubt_records)}</div>
-                <div class="kpi-title">विद्यार्थ्यांनी विचारलेल्या शंका</div>
+                <div class="kpi-num">{len(st.session_state.reaction_submissions)}</div>
+                <div class="kpi-title">जमा झालेल्या चाचण्या</div>
             </div>
             """, unsafe_allow_html=True)
         with kpi3:
             st.markdown(f"""
             <div class="kpi-card">
+                <div class="kpi-num">{len(st.session_state.doubt_records)}</div>
+                <div class="kpi-title">विद्यार्थ्यांच्या शंका</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with kpi4:
+            st.markdown(f"""
+            <div class="kpi-card">
                 <div class="kpi-num">{len(REACTIONS_DATA)}</div>
-                <div class="kpi-title">सक्रिय रासायनिक अभिक्रिया सराव</div>
+                <div class="kpi-title">अभिक्रिया प्रश्न संख्या</div>
             </div>
             """, unsafe_allow_html=True)
 
         st.write("")
         st.write("")
 
-        tab_dash1, tab_dash2 = st.tabs(["📋 विद्यार्थी हजेरी व लॉगिन यादी (Login Logs)", "📬 आलेल्या शंका (Student Doubts)"])
+        tab_dash1, tab_dash2, tab_dash3 = st.tabs([
+            "📋 विद्यार्थी हजेरी व लॉगिन (Logs)", 
+            "🧪 रासायनिक अभिक्रिया निकाल व उत्तरे (Test Results)",
+            "📬 आलेल्या शंका (Student Doubts)"
+        ])
 
         with tab_dash1:
             st.subheader("विद्यार्थी हजेरी आणि लॉगिन तपशील")
@@ -461,6 +472,44 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
                 st.info("अद्याप कोणत्याही विद्यार्थ्याने लॉगिन केलेले नाही.")
 
         with tab_dash2:
+            st.subheader("🧪 रासायनिक अभिक्रिया सराव चाचणीचे मूल्यमापन (Student Submissions)")
+            if st.session_state.reaction_submissions:
+                summary_data = []
+                for sub in st.session_state.reaction_submissions:
+                    summary_data.append({
+                        "विद्यार्थी": sub["विद्यार्थी"],
+                        "इयत्ता": sub["इयत्ता"],
+                        "रोल नं": sub["रोल नं"],
+                        "ईमेल": sub["ईमेल"],
+                        "तारीख व वेळ": sub["तारीख व वेळ"],
+                        "प्राप्त गुण (Score)": sub["गुण"]
+                    })
+                df_results = pd.DataFrame(summary_data)
+                st.dataframe(df_results, use_container_width=True)
+
+                st.divider()
+                st.markdown("#### 🔍 वैयक्तिक विद्यार्थ्याचे सविस्तर उत्तरपत्रिका तपासणे:")
+                student_names = [f"{s['विद्यार्थी']} (रोल नं: {s['रोल नं']}) - {s['तारीख व वेळ']}" for s in st.session_state.reaction_submissions]
+                chosen_idx = st.selectbox("कोणत्या विद्यार्थ्याची उत्तरपत्रिका तपासायची आहे ते निवडा:", range(len(student_names)), format_func=lambda i: student_names[i])
+                
+                selected_sub = st.session_state.reaction_submissions[chosen_idx]
+                st.info(f"👤 **विद्यार्थी:** {selected_sub['विद्यार्थी']} | **एकूण गुण:** {selected_sub['गुण']}")
+                
+                df_details = pd.DataFrame(selected_sub["तपशील"])
+                st.dataframe(df_details[["अभिक्रिया क्र", "विद्यार्थ्याचे उत्तर", "योग्य उत्तर", "निकाल"]], use_container_width=True)
+
+                # चाचणी निकाल CSV डाऊनलोड
+                csv_sub = df_results.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 रासायनिक अभिक्रिया निकाल डाऊनलोड करा (Download CSV)",
+                    data=csv_sub,
+                    file_name=f"reaction_quiz_results_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.info("अद्याप कोणत्याही विद्यार्थ्याने रासायनिक अभिक्रिया चाचणी सबमिट केलेली नाही.")
+
+        with tab_dash3:
             st.subheader("विद्यार्थ्यांनी विचारलेल्या शंकांचे व्यवस्थापन")
             if st.session_state.doubt_records:
                 df_doubts = pd.DataFrame(st.session_state.doubt_records)
