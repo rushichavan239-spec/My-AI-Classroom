@@ -16,11 +16,14 @@ st.set_page_config(
 if "logged_student" not in st.session_state:
     st.session_state.logged_student = None
 
+if "current_rxn_idx" not in st.session_state:
+    st.session_state.current_rxn_idx = 0
+
 if "student_logins" not in st.session_state:
     st.session_state.student_logins = [
-        {"नाव": "आर्यन पाटील", "इयत्ता": "१० वी (10th)", "रोल नं": "12", "लॉगिन वेळ": "2026-09-02 10:15"},
-        {"नाव": "सिया कुलकर्णी", "इयत्ता": "९ वी (9th)", "रोल नं": "24", "लॉगिन वेळ": "2026-09-02 11:30"},
-        {"नाव": "रोहन शिंदे", "इयत्ता": "१० वी (10th)", "रोल नं": "08", "लॉगिन वेळ": "2026-09-02 14:05"}
+        {"नाव": "आर्यन पाटील", "इयत्ता": "१० वी (10th)", "रोल नं": "12", "ईमेल": "aryan.patil@example.com", "लॉगिन वेळ": "2026-09-02 10:15"},
+        {"नाव": "सिया कुलकर्णी", "इयत्ता": "९ वी (9th)", "रोल नं": "24", "ईमेल": "siya.k@example.com", "लॉगिन वेळ": "2026-09-02 11:30"},
+        {"नाव": "रोहन शिंदे", "इयत्ता": "१० वी (10th)", "रोल नं": "08", "ईमेल": "rohan.shinde@example.com", "लॉगिन वेळ": "2026-09-02 14:05"}
     ]
 
 if "doubt_records" not in st.session_state:
@@ -176,9 +179,8 @@ REACTIONS_DATA = [
 with st.sidebar:
     st.markdown("### 👨‍🏫 **शिक्षक प्रोफाईल**")
     st.markdown("""
-    **नाव:** प्रा. राहुल सावंत  
-    **पद:** Secondary Teacher & AI Educator  
-    **विषय:** विज्ञान आणि Artificial Intelligence
+    **नाव:** ऋषिकेश चव्हाण  
+    **विषय:** गणित, विज्ञान आणि AI
     """)
     st.divider()
 
@@ -256,17 +258,19 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
         with col_b:
             with st.form("student_login_form"):
                 s_name = st.text_input("विद्यार्थ्याचे पूर्ण नाव (Full Name):", placeholder="उदा. राहुल शर्मा")
+                s_email = st.text_input("ईमेल आयडी (Email ID):", placeholder="उदा. student@example.com")
                 s_class = st.selectbox("इयत्ता (Class):", ["८ वी (8th)", "९ वी (9th)", "१० वी (10th)"])
                 s_roll = st.text_input("हजेरी क्रमांक / रोल नंबर (Roll No):", placeholder="उदा. 15")
                 
                 login_submit = st.form_submit_button("🚀 अभ्यासक्रमात प्रवेश करा (Enter Classroom)", use_container_width=True)
                 
                 if login_submit:
-                    if s_name.strip() and s_roll.strip():
+                    if s_name.strip() and s_roll.strip() and s_email.strip():
                         # Save student state
                         now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                         student_data = {
                             "नाव": s_name.strip(),
+                            "ईमेल": s_email.strip(),
                             "इयत्ता": s_class,
                             "रोल नं": s_roll.strip(),
                             "लॉगिन वेळ": now_str
@@ -276,7 +280,7 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                         st.success("लॉगिन यशस्वी झाले! अभ्यासक्रम उघडत आहे...")
                         st.rerun()
                     else:
-                        st.error("कृपया तुमचे नाव आणि हजेरी क्रमांक दोन्ही भरा.")
+                        st.error("कृपया तुमचे नाव, ईमेल आयडी आणि हजेरी क्रमांक भरा.")
     else:
         # Student is logged in: Show subjects content
         st.markdown(f"""
@@ -294,7 +298,7 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
             with tab1:
                 st.subheader("🧪 धडा ३: रासायनिक अभिक्रिया आणि समीकरणे (Chemical Reactions & Equations)")
                 st.markdown("""
-                रासायनिक अभिक्रियांचे प्रामुख्याने **४ मुख्य प्रकार** असतात:
+                रासायनिक अभिक्रियांचे प्रामु換えने **४ मुख्य प्रकार** असतात:
                 1. **➕ संयोग (Combination):** दोन किंवा अधिक अभिक्रियाकारकांपासून एकच उत्पादित तयार होते.
                 2. **💥 अपघटन (Decomposition):** एकाच अभिक्रियाकारकाचे विघटन होऊन दोन किंवा अधिक उत्पादिते मिळतात.
                 3. **🔄 विस्थापन (Displacement):** अधिक क्रियाशील मूलद्रव्य कमी क्रियाशील मूलद्रव्याला विस्थापित करते.
@@ -312,13 +316,15 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                             st.write(f"💡 **स्पष्टीकरण:** {r['explanation']}")
                 
                 elif mode == "🎮 इंटरॅक्टिव्ह सोडवून पहा (Interactive Practice)":
-                    selected_rxn_idx = st.selectbox(
-                        "अभिक्रिया निवडा:", 
-                        range(len(REACTIONS_DATA)),
-                        format_func=lambda i: f"अभिक्रिया {REACTIONS_DATA[i]['id']}"
-                    )
-                    curr = REACTIONS_DATA[selected_rxn_idx]
-                    st.markdown(f"### रासायनिक समीकरण:")
+                    total_rxns = len(REACTIONS_DATA)
+                    curr_idx = st.session_state.current_rxn_idx
+                    curr = REACTIONS_DATA[curr_idx]
+
+                    # Sequential Progress indicator
+                    st.progress((curr_idx + 1) / total_rxns)
+                    st.markdown(f"#### 📍 **अभिक्रिया {curr_idx + 1} / {total_rxns}**")
+
+                    st.markdown("##### रासायनिक समीकरण:")
                     st.latex(curr["reaction"])
                     
                     options_list = [
@@ -327,14 +333,38 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                         "🔄 विस्थापन अभिक्रिया (Displacement)",
                         "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)"
                     ]
-                    user_choice = st.radio("ही कोणत्या प्रकारची रासायनिक अभिक्रिया आहे? 🤔", options_list, key=f"rxn_quiz_{selected_rxn_idx}")
+                    user_choice = st.radio(
+                        "ही कोणत्या प्रकारची रासायनिक अभिक्रिया आहे? 🤔",
+                        options_list,
+                        key=f"rxn_step_{curr_idx}"
+                    )
                     
-                    if st.button("उत्तर तपासा (Check Answer)", key=f"btn_{selected_rxn_idx}"):
-                        if user_choice == curr["type"]:
-                            st.success(f"🎉 **अगदी बरोबर!** हे `{curr['type']}` चे उदाहरण आहे.")
+                    col_chk, col_space = st.columns([1, 2])
+                    with col_chk:
+                        if st.button("उत्तर तपासा (Check Answer)", key=f"btn_check_{curr_idx}"):
+                            if user_choice == curr["type"]:
+                                st.success(f"🎉 **अगदी बरोबर!** हे `{curr['type']}` चे उदाहरण आहे.")
+                            else:
+                                st.error(f"❌ **चूक!** योग्य उत्तर आहे: `{curr['type']}`")
+                            st.info(f"💡 **स्पष्टीकरण:** {curr['explanation']}")
+
+                    st.divider()
+
+                    # Sequential Navigation Buttons (मागील, पुढील)
+                    nav_col1, nav_col2, nav_col3 = st.columns([1, 2, 1])
+                    with nav_col1:
+                        if st.button("⬅️ मागील अभिक्रिया", disabled=(curr_idx == 0)):
+                            st.session_state.current_rxn_idx -= 1
+                            st.rerun()
+                    with nav_col3:
+                        if curr_idx < total_rxns - 1:
+                            if st.button("➡️ पुढील अभिक्रिया"):
+                                st.session_state.current_rxn_idx += 1
+                                st.rerun()
                         else:
-                            st.error(f"❌ **चूक!** योग्य उत्तर आहे: `{curr['type']}`")
-                        st.info(f"💡 **स्पष्टीकरण:** {curr['explanation']}")
+                            if st.button("🔄 पुन्हा सुरू करा"):
+                                st.session_state.current_rxn_idx = 0
+                                st.rerun()
 
             with tab2:
                 st.subheader("🪐 धडा १: गुरुत्वाकर्षण (Gravitation) - महत्त्वाचे मुद्दे")
@@ -417,11 +447,11 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
     st.header("📊 शिक्षक नियंत्रण कक्ष (Teacher Admin Dashboard)")
     st.write("विद्यार्थ्यांची उपस्थिती, लॉगिन रेकॉर्ड आणि विचारलेल्या शंकांचे विश्लेषण.")
 
-    # Password Protection for Teacher
-    teacher_password = st.text_input("🔑 शिक्षकांचा गुप्त पासवर्ड टाका (Teacher PIN):", type="password", help="Default PIN: gurukul123")
+    # Password Protection for Teacher (Default password hint removed)
+    teacher_password = st.text_input("🔑 शिक्षकांचा गुप्त पासवर्ड टाका (Teacher PIN):", type="password")
     
     if teacher_password == "gurukul123":
-        st.success("प्रवेश मंजूर झाला! स्वागत आहे प्रा. सावंत सर 👨‍🏫")
+        st.success("प्रवेश मंजूर झाला! स्वागत आहे ऋषिकेश चव्हाण सर 👨‍🏫")
         st.divider()
 
         # Key Metrics Row
@@ -481,7 +511,7 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
     elif teacher_password != "":
         st.error("चुकीचा पासवर्ड! कृपया योग्य पासवर्ड टाका.")
     else:
-        st.warning("⚠️ हा भाग केवळ शिक्षकांसाठी राखीव आहे. कृपया वरील बॉक्समध्ये पासवर्ड टाका. (सुरवातीसाठी डिफॉल्ट पासवर्ड: `gurukul123` आहे.)")
+        st.warning("⚠️ हा भाग केवळ शिक्षकांसाठी राखीव आहे. कृपया वरील बॉक्समध्ये पासवर्ड प्रविष्ट करा.")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: gray;'>© 2026 AI गुरूकुल | प्रा. राहुल सावंत</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray;'>© 2026 AI गुरूकुल | ऋषिकेश चव्हाण</p>", unsafe_allow_html=True)
