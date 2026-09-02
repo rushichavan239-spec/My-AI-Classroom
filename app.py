@@ -1,10 +1,12 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import re
+import random
 
 # Page configuration
 st.set_page_config(
-    page_title="AI गुरूकुल | Teacher & Student Hub",
+    page_title="AI गुरूकुल | ऋषिकेश चव्हाण",
     page_icon="🎓",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -16,21 +18,25 @@ st.set_page_config(
 if "logged_student" not in st.session_state:
     st.session_state.logged_student = None
 
-if "current_rxn_idx" not in st.session_state:
-    st.session_state.current_rxn_idx = 0
-
 if "student_logins" not in st.session_state:
     st.session_state.student_logins = [
         {"नाव": "आर्यन पाटील", "इयत्ता": "१० वी (10th)", "रोल नं": "12", "ईमेल": "aryan.patil@example.com", "लॉगिन वेळ": "2026-09-02 10:15"},
-        {"नाव": "सिया कुलकर्णी", "इयत्ता": "९ वी (9th)", "रोल नं": "24", "ईमेल": "siya.k@example.com", "लॉगिन वेळ": "2026-09-02 11:30"},
-        {"नाव": "रोहन शिंदे", "इयत्ता": "१० वी (10th)", "रोल नं": "08", "ईमेल": "rohan.shinde@example.com", "लॉगिन वेळ": "2026-09-02 14:05"}
+        {"नाव": "सिया कुलकर्णी", "इयत्ता": "९ वी (9th)", "रोल नं": "24", "ईमेल": "siya.k@example.com", "लॉगिन वेळ": "2026-09-02 11:30"}
     ]
 
 if "doubt_records" not in st.session_state:
     st.session_state.doubt_records = [
-        {"विद्यार्थी": "आर्यन पाटील", "इयत्ता": "१० वी", "शंका": "विस्थापन आणि दुहेरी विस्थापन अभिक्रियेतील मुख्य फरक काय?", "वेळ": "2026-09-02 10:20"},
-        {"विद्यार्थी": "सिया कुलकर्णी", "इयत्ता": "९ वी", "शंका": "गुरुत्वीय त्वरण चंद्रावर किती असते?", "वेळ": "2026-09-02 11:45"}
+        {"विद्यार्थी": "आर्यन पाटील", "इयत्ता": "१० वी", "शंका": "विस्थापन आणि दुहेरी विस्थापन अभिक्रियेतील मुख्य फरक काय?", "वेळ": "2026-09-02 10:20"}
     ]
+
+if "reaction_submissions" not in st.session_state:
+    st.session_state.reaction_submissions = []
+
+if "generated_otp" not in st.session_state:
+    st.session_state.generated_otp = None
+
+if "otp_sent_to" not in st.session_state:
+    st.session_state.otp_sent_to = ""
 
 # -------------------------------------------------------------
 # 🎨 डिझाईन आणि CSS स्टाईलिंग (CUSTOM CSS)
@@ -76,9 +82,9 @@ st.markdown("""
         background: #ffffff;
         border: 2px solid #3b82f6;
         border-radius: 16px;
-        padding: 2rem;
+        padding: 1.8rem;
         box-shadow: 0 8px 24px rgba(59, 130, 246, 0.12);
-        max-width: 550px;
+        max-width: 600px;
         margin: auto;
     }
 
@@ -86,11 +92,11 @@ st.markdown("""
         background-color: #ecfdf5;
         border: 1px solid #10b981;
         color: #065f46;
-        padding: 0.5rem 1rem;
-        border-radius: 8px;
+        padding: 0.7rem 1.2rem;
+        border-radius: 10px;
         display: inline-block;
         font-weight: 600;
-        margin-bottom: 1rem;
+        margin-bottom: 1.5rem;
     }
 
     .kpi-card {
@@ -110,6 +116,15 @@ st.markdown("""
         font-size: 0.9rem;
         color: #64748b;
     }
+
+    .reaction-card {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-left: 5px solid #2563eb;
+        border-radius: 12px;
+        padding: 1.2rem;
+        margin-bottom: 1.5rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -128,7 +143,7 @@ QUIZ_DATABASE = {
             "question": "ChatGPT आणि Gemini हे AI च्या कोणत्या प्रकारात मोडतात?",
             "options": ["Robotic Hardware", "Generative AI (LLM)", "Antivirus Tool", "Database"],
             "answer": "Generative AI (LLM)",
-            "explanation": "हे Large Language Models (LLM) असून नवीन माहिती व मजकूर तयार (Generate) करतात."
+            "explanation": "हे Large Language Models (LLM) असून नवीन मजकूर तयार (Generate) करतात."
         }
     ],
     "🔬 सामान्य विज्ञान (Science)": [
@@ -136,13 +151,13 @@ QUIZ_DATABASE = {
             "question": "पाण्याचे रासायनिक सूत्र (Chemical Formula) काय आहे?",
             "options": ["CO2", "NaCl", "H2O", "O2"],
             "answer": "H2O",
-            "explanation": "हायड्रोजनचे दोन अणू आणि ऑक्सिजनचा एक अणू मिळून पाणी (H2O) तयार होते."
+            "explanation": "हायड्रोजन आणि ऑक्सिजन मिळून पाणी (H2O) तयार होते."
         },
         {
             "question": "पृथ्वीच्या पृष्ठभागावर गुरुत्वीय त्वरण ($g$) चे सरासरी मूल्य किती असते?",
             "options": ["$9.8 \\text{ m/s}^2$", "$8.9 \\text{ m/s}^2$", "$10.5 \\text{ m/s}^2$", "$0 \\text{ m/s}^2$"],
             "answer": "$9.8 \\text{ m/s}^2$",
-            "explanation": "पृथ्वीच्या गुरुत्वाकर्षणामुळे वस्तूवर प्रयुक्त होणारे सरासरी त्वरण $9.8 \\text{ m/s}^2$ असते."
+            "explanation": "पृथ्वीवरील सरासरी गुरुत्वीय त्वरण $9.8 \\text{ m/s}^2$ असते."
         }
     ]
 }
@@ -150,31 +165,43 @@ QUIZ_DATABASE = {
 # -------------------------------------------------------------
 # 🧪 रासायनिक अभिक्रियांचा संपूर्ण सराव डेटा (२० अभिक्रिया)
 # -------------------------------------------------------------
-REACTIONS_DATA = [
-    {"id": 1, "reaction": r"\text{Li}_2\text{O} + \text{H}_2\text{O} \longrightarrow 2\text{LiOH}", "type": "➕ संयोग अभिक्रिया (Combination)", "explanation": "लिथियम ऑक्साइड आणि पाणी एकत्र येऊन एकच उत्पादित तयार होते."},
-    {"id": 2, "reaction": r"2\text{KClO}_3 \xrightarrow{\Delta} 2\text{KCl} + 3\text{O}_2\uparrow", "type": "💥 अपघटन अभिक्रिया (Decomposition)", "explanation": "उष्णतेने एकाच संयुगाचे विघटन होऊन दोन वेगळी उत्पादिते मिळतात."},
-    {"id": 3, "reaction": r"\text{Mg} + 2\text{AgNO}_3 \longrightarrow \text{Mg(NO}_3)_2 + 2\text{Ag}", "type": "🔄 विस्थापन अभिक्रिया (Displacement)", "explanation": "मॅग्नेशियम हा सिल्व्हरपेक्षा जास्त क्रियाशील असल्याने सिल्व्हरला विस्थापित करतो."},
-    {"id": 4, "reaction": r"\text{Pb(NO}_3)_2 + 2\text{KI} \longrightarrow \text{PbI}_2\downarrow + 2\text{KNO}_3", "type": "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)", "explanation": "आयनांची अदलाबदल होऊन लेड आयोडाइडचा पिवळा अवक्षेप तयार होतो."},
-    {"id": 5, "reaction": r"2\text{NO} + \text{O}_2 \longrightarrow 2\text{NO}_2", "type": "➕ संयोग अभिक्रिया (Combination)", "explanation": "नायट्रिक ऑक्साइड आणि ऑक्सिजन एकत्र येऊन नायट्रोजन डायऑक्साइड बनते."},
-    {"id": 6, "reaction": r"\text{NH}_4\text{NO}_3 \xrightarrow{\Delta} \text{N}_2\text{O} + 2\text{H}_2\text{O}", "type": "💥 अपघटन अभिक्रिया (Decomposition)", "explanation": "अमोनियम नायट्रेटला उष्णता दिल्यावर त्याचे विघटन होते."},
-    {"id": 7, "reaction": r"\text{Ni} + 2\text{HCl} \longrightarrow \text{NiCl}_2 + \text{H}_2\uparrow", "type": "🔄 विस्थापन अभिक्रिया (Displacement)", "explanation": "निकेल हायड्रोजनपेक्षा जास्त क्रियाशील असल्याने हायड्रोजनचे विस्थापन करतो."},
-    {"id": 8, "reaction": r"\text{Al}_2(\text{SO}_4)_3 + 6\text{NaOH} \longrightarrow 2\text{Al(OH)}_3\downarrow + 3\text{Na}_2\text{SO}_4", "type": "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)", "explanation": "आयनांच्या परस्पर देवाणघेवाणीमुळे अल्युमिनियम हायड्रॉक्साइडचा अवक्षेप तयार होतो."},
-    {"id": 9, "reaction": r"\text{P}_4 + 6\text{Cl}_2 \longrightarrow 4\text{PCl}_3", "type": "➕ संयोग अभिक्रिया (Combination)", "explanation": "फॉस्फरस आणि क्लोरीन एकत्र येऊन फॉस्फरस ट्रायक्लोराइड हे एकच उत्पादित बनते."},
-    {"id": 10, "reaction": r"2\text{Al(OH)}_3 \xrightarrow{\Delta} \text{Al}_2\text{O}_3 + 3\text{H}_2\text{O}", "type": "💥 अपघटन अभिक्रिया (Decomposition)", "explanation": "उष्णतेने अल्युमिनियम हायड्रॉक्साइडचे अपघटन होऊन अल्युमिना व पाण्याची वाफ मिळते."},
-    {"id": 11, "reaction": r"\text{Cl}_2 + 2\text{NaBr} \longrightarrow 2\text{NaCl} + \text{Br}_2", "type": "🔄 विस्थापन अभिक्रिया (Displacement)", "explanation": "क्लोरीन ब्रोमाइड आयनाला विस्थापित करतो."},
-    {"id": 12, "reaction": r"\text{CuSO}_4 + 2\text{KOH} \longrightarrow \text{Cu(OH)}_2\downarrow + \text{K}_2\text{SO}_4", "type": "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)", "explanation": "आयनांच्या अदलाबदलीने कॉपर हायड्रॉक्साइडचा निळा अवक्षेप मिळतो."},
-    {"id": 13, "reaction": r"\text{SO}_3 + \text{H}_2\text{O} \longrightarrow \text{H}_2\text{SO}_4", "type": "➕ संयोग अभिक्रिया (Combination)", "explanation": "सल्फर ट्रायऑक्साइड आणि पाणी एकत्र येऊन सल्फ्यूरिक आम्ल तयार होते."},
-    {"id": 14, "reaction": r"2\text{Ag}_2\text{O} \xrightarrow{\Delta} 4\text{Ag} + \text{O}_2\uparrow", "type": "💥 अपघटन अभिक्रिया (Decomposition)", "explanation": "उष्णतेमुळे सिल्व्हर ऑक्साइडचे अपघटन होते."},
-    {"id": 15, "reaction": r"\text{Cr}_2\text{O}_3 + 2\text{Al} \longrightarrow \text{Al}_2\text{O}_3 + 2\text{Cr}", "type": "🔄 विस्थापन अभिक्रिया (Displacement)", "explanation": "अल्युमिनियम क्रोमियमला विस्थापित करतो."},
-    {"id": 16, "reaction": r"\text{AgNO}_3 + \text{KBr} \longrightarrow \text{AgBr}\downarrow + \text{KNO}_3", "type": "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)", "explanation": "सिल्व्हर ब्रोमाइडचा फिकट पिवळा अवक्षेप तयार होतो."},
-    {"id": 17, "reaction": r"\text{BaO} + \text{CO}_2 \longrightarrow \text{BaCO}_3", "type": "➕ संयोग अभिक्रिया (Combination)", "explanation": "बेरियम ऑक्साईड आणि कार्बन डायऑक्साईड एकत्र येऊन बेरियम कार्बोनेट बनते."},
-    {"id": 18, "reaction": r"2\text{NaHCO}_3 \xrightarrow{\Delta} \text{Na}_2\text{CO}_3 + \text{H}_2\text{O} + \text{CO}_2\uparrow", "type": "💥 अपघटन अभिक्रिया (Decomposition)", "explanation": "खाण्याचा सोडा तापविल्यावर त्याचे अपघटन होते."},
-    {"id": 19, "reaction": r"\text{Sn} + 2\text{AgNO}_3 \longrightarrow \text{Sn(NO}_3)_2 + 2\text{Ag}", "type": "🔄 विस्थापन अभिक्रिया (Displacement)", "explanation": "टिन (Sn) सिल्व्हरचे विस्थापन करतो."},
-    {"id": 20, "reaction": r"\text{FeCl}_3 + 3\text{NH}_4\text{OH} \longrightarrow \text{Fe(OH)}_3\downarrow + 3\text{NH}_4\text{Cl}", "type": "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)", "explanation": "फेरिक हायड्रॉक्साइडचा लालसर-तपकिरी अवक्षेप तयार होतो."}
+REACTION_OPTIONS = [
+    "➕ संयोग अभिक्रिया (Combination)",
+    "💥 अपघटन अभिक्रिया (Decomposition)",
+    "🔄 विस्थापन अभिक्रिया (Displacement)",
+    "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)"
 ]
 
+REACTIONS_DATA = [
+    {"id": 1, "reaction": r"\text{Li}_2\text{O} + \text{H}_2\text{O} \longrightarrow 2\text{LiOH}", "correct": "➕ संयोग अभिक्रिया (Combination)"},
+    {"id": 2, "reaction": r"2\text{KClO}_3 \xrightarrow{\Delta} 2\text{KCl} + 3\text{O}_2\uparrow", "correct": "💥 अपघटन अभिक्रिया (Decomposition)"},
+    {"id": 3, "reaction": r"\text{Mg} + 2\text{AgNO}_3 \longrightarrow \text{Mg(NO}_3)_2 + 2\text{Ag}", "correct": "🔄 विस्थापन अभिक्रिया (Displacement)"},
+    {"id": 4, "reaction": r"\text{Pb(NO}_3)_2 + 2\text{KI} \longrightarrow \text{PbI}_2\downarrow + 2\text{KNO}_3", "correct": "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)"},
+    {"id": 5, "reaction": r"2\text{NO} + \text{O}_2 \longrightarrow 2\text{NO}_2", "correct": "➕ संयोग अभिक्रिया (Combination)"},
+    {"id": 6, "reaction": r"\text{NH}_4\text{NO}_3 \xrightarrow{\Delta} \text{N}_2\text{O} + 2\text{H}_2\text{O}", "correct": "💥 अपघटन अभिक्रिया (Decomposition)"},
+    {"id": 7, "reaction": r"\text{Ni} + 2\text{HCl} \longrightarrow \text{NiCl}_2 + \text{H}_2\uparrow", "correct": "🔄 विस्थापन अभिक्रिया (Displacement)"},
+    {"id": 8, "reaction": r"\text{Al}_2(\text{SO}_4)_3 + 6\text{NaOH} \longrightarrow 2\text{Al(OH)}_3\downarrow + 3\text{Na}_2\text{SO}_4", "correct": "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)"},
+    {"id": 9, "reaction": r"\text{P}_4 + 6\text{Cl}_2 \longrightarrow 4\text{PCl}_3", "correct": "➕ संयोग अभिक्रिया (Combination)"},
+    {"id": 10, "reaction": r"2\text{Al(OH)}_3 \xrightarrow{\Delta} \text{Al}_2\text{O}_3 + 3\text{H}_2\text{O}", "correct": "💥 अपघटन अभिक्रिया (Decomposition)"},
+    {"id": 11, "reaction": r"\text{Cl}_2 + 2\text{NaBr} \longrightarrow 2\text{NaCl} + \text{Br}_2", "correct": "🔄 विस्थापन अभिक्रिया (Displacement)"},
+    {"id": 12, "reaction": r"\text{CuSO}_4 + 2\text{KOH} \longrightarrow \text{Cu(OH)}_2\downarrow + \text{K}_2\text{SO}_4", "correct": "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)"},
+    {"id": 13, "reaction": r"\text{SO}_3 + \text{H}_2\text{O} \longrightarrow \text{H}_2\text{SO}_4", "correct": "➕ संयोग अभिक्रिया (Combination)"},
+    {"id": 14, "reaction": r"2\text{Ag}_2\text{O} \xrightarrow{\Delta} 4\text{Ag} + \text{O}_2\uparrow", "correct": "💥 अपघटन अभिक्रिया (Decomposition)"},
+    {"id": 15, "reaction": r"\text{Cr}_2\text{O}_3 + 2\text{Al} \longrightarrow \text{Al}_2\text{O}_3 + 2\text{Cr}", "correct": "🔄 विस्थापन अभिक्रिया (Displacement)"},
+    {"id": 16, "reaction": r"\text{AgNO}_3 + \text{KBr} \longrightarrow \text{AgBr}\downarrow + \text{KNO}_3", "correct": "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)"},
+    {"id": 17, "reaction": r"\text{BaO} + \text{CO}_2 \longrightarrow \text{BaCO}_3", "correct": "➕ संयोग अभिक्रिया (Combination)"},
+    {"id": 18, "reaction": r"2\text{NaHCO}_3 \xrightarrow{\Delta} \text{Na}_2\text{CO}_3 + \text{H}_2\text{O} + \text{CO}_2\uparrow", "correct": "💥 अपघटन अभिक्रिया (Decomposition)"},
+    {"id": 19, "reaction": r"\text{Sn} + 2\text{AgNO}_3 \longrightarrow \text{Sn(NO}_3)_2 + 2\text{Ag}", "correct": "🔄 विस्थापन अभिक्रिया (Displacement)"},
+    {"id": 20, "reaction": r"\text{FeCl}_3 + 3\text{NH}_4\text{OH} \longrightarrow \text{Fe(OH)}_3\downarrow + 3\text{NH}_4\text{Cl}", "correct": "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)"}
+]
+
+# Helper function to validate email
+def is_valid_email(email_str):
+    pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+    return re.match(pattern, email_str.strip()) is not None
+
 # -------------------------------------------------------------
-# 🧭 SIDEBAR NAVIGATION
+# 🧭 SIDEBAR NAVIGATION & TEACHER PROFILE
 # -------------------------------------------------------------
 with st.sidebar:
     st.markdown("### 👨‍🏫 **शिक्षक प्रोफाईल**")
@@ -184,11 +211,13 @@ with st.sidebar:
     """)
     st.divider()
 
-    # Logged In status indicator
+    # Logged In student status
     if st.session_state.logged_student:
-        st.success(f"👤 **लॉगिन:** {st.session_state.logged_student['नाव']} ({st.session_state.logged_student['इयत्ता']})")
-        if st.button("🚪 लॉगआउट (Logout)", key="logout_btn"):
+        st.success(f"👤 **लॉगिन विद्यार्थी:**\n**{st.session_state.logged_student['नाव']}** ({st.session_state.logged_student['इयत्ता']})")
+        if st.button("🚪 लॉगआउट (Logout)", key="logout_btn", use_container_width=True):
             st.session_state.logged_student = None
+            st.session_state.generated_otp = None
+            st.session_state.otp_sent_to = ""
             st.rerun()
         st.divider()
 
@@ -222,70 +251,87 @@ if selected_page == "🏠 मुख्य पान (Home)":
         st.markdown("""
         <div class="feature-card">
             <h4>📖 सुरक्षित अभ्यासक्रम</h4>
-            <p>विद्यार्थी हजेरीसह लॉग-इन करून विज्ञान व गणिताच्या विशेष नोट्स आणि अभिक्रियांचा सराव करू शकतात.</p>
+            <p>विद्यार्थी ईमेल OTP सह सुरक्षित लॉगिन करून रासायनिक अभिक्रिया व नोट्सचा अभ्यास करू शकतात.</p>
         </div>
         """, unsafe_allow_html=True)
     with col2:
         st.markdown("""
         <div class="feature-card">
             <h4>🤖 AI चे प्रात्यक्षिक</h4>
-            <p>Prompt Engineering, Machine Learning व AI टूल्स कसे वापरावे याचे थेट प्रॅक्टिकल ज्ञान.</p>
+            <p>Prompt Engineering, Machine Learning व AI टूल्स कसे वापरावे याचे थेट प्रॅक्टिकल मार्गदर्शन.</p>
         </div>
         """, unsafe_allow_html=True)
     with col3:
         st.markdown("""
         <div class="feature-card">
             <h4>📊 शिक्षक डॅशबोर्ड</h4>
-            <p>कोणता विद्यार्थी कधी आला, त्याने कोणत्या शंका विचारल्या हे सर्व शिक्षकांना एकाच डॅशबोर्डवर उपलब्ध.</p>
+            <p>विद्यार्थ्यांची हजेरी, अभिक्रिया चाचणी निकाल आणि शंकांचे सविस्तर मूल्यमापन शिक्षकांसाठी उपलब्ध.</p>
         </div>
         """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 2. SUBJECTS PAGE (WITH STUDENT LOGIN GATE)
+# 2. SUBJECTS PAGE (WITH STUDENT OTP LOGIN GATE)
 # -------------------------------------------------------------
 elif selected_page == "📚 शालेय अभ्यासक्रम (Subjects) 🔒":
-    # Check if student is logged in
     if st.session_state.logged_student is None:
         st.markdown("""
         <div class="login-box">
-            <h3 style="text-align: center; color: #1E3A8A;">🔐 विद्यार्थी प्रवेश (Student Login)</h3>
-            <p style="text-align: center; color: #64748B;">शालेय अभ्यासक्रम व रासायनिक अभिक्रियांचा सराव पाहण्यासाठी कृपया तुमची माहिती भरा.</p>
+            <h3 style="text-align: center; color: #1E3A8A; margin-bottom: 0.5rem;">🔐 विद्यार्थी प्रवेश (Student Login)</h3>
+            <p style="text-align: center; color: #64748B; font-size: 0.95rem;">शालेय अभ्यासक्रम व रासायनिक अभिक्रियांचा सराव पाहण्यासाठी कृपया तुमची माहिती व वैध ईमेल नोंदवा.</p>
         </div>
         """, unsafe_allow_html=True)
         st.write("")
 
-        col_a, col_b, col_c = st.columns([1, 2, 1])
-        with col_b:
-            with st.form("student_login_form"):
-                s_name = st.text_input("विद्यार्थ्याचे पूर्ण नाव (Full Name):", placeholder="उदा. राहुल शर्मा")
-                s_email = st.text_input("ईमेल आयडी (Email ID):", placeholder="उदा. student@example.com")
+        col_l1, col_center, col_l2 = st.columns([1, 2, 1])
+        with col_center:
+            with st.container(border=True):
+                s_name = st.text_input("विद्यार्थ्याचे पूर्ण नाव (Full Name):", placeholder="उदा. राहुल सचिन पाटील")
                 s_class = st.selectbox("इयत्ता (Class):", ["८ वी (8th)", "९ वी (9th)", "१० वी (10th)"])
                 s_roll = st.text_input("हजेरी क्रमांक / रोल नंबर (Roll No):", placeholder="उदा. 15")
-                
-                login_submit = st.form_submit_button("🚀 अभ्यासक्रमात प्रवेश करा (Enter Classroom)", use_container_width=True)
-                
-                if login_submit:
-                    if s_name.strip() and s_roll.strip() and s_email.strip():
-                        # Save student state
-                        now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                        student_data = {
-                            "नाव": s_name.strip(),
-                            "ईमेल": s_email.strip(),
-                            "इयत्ता": s_class,
-                            "रोल नं": s_roll.strip(),
-                            "लॉगिन वेळ": now_str
-                        }
-                        st.session_state.logged_student = student_data
-                        st.session_state.student_logins.append(student_data)
-                        st.success("लॉगिन यशस्वी झाले! अभ्यासक्रम उघडत आहे...")
-                        st.rerun()
-                    else:
-                        st.error("कृपया तुमचे नाव, ईमेल आयडी आणि हजेरी क्रमांक भरा.")
+                s_email = st.text_input("वैध ईमेल आयडी (Email ID):", placeholder="उदा. rahul@example.com")
+
+                # Step 1: Request OTP
+                col_otp_btn, col_otp_dummy = st.columns([1.5, 1])
+                with col_otp_btn:
+                    if st.button("📩 ईमेलवर OTP मिळवा (Send OTP)", use_container_width=True):
+                        if not s_name.strip() or not s_roll.strip():
+                            st.error("❌ कृपया आधी तुमचे नाव आणि हजेरी क्रमांक भरा.")
+                        elif not is_valid_email(s_email):
+                            st.error("❌ अवैध ईमेल! कृपया योग्य ईमेल आयडी (उदा. user@gmail.com) प्रविष्ट करा.")
+                        else:
+                            generated = str(random.randint(100000, 999999))
+                            st.session_state.generated_otp = generated
+                            st.session_state.otp_sent_to = s_email.strip()
+                            st.success(f"✅ पडताळणी कोड (OTP) तयार झाला आहे!")
+                            st.info(f"🔑 **चाचणीसाठी OTP:** `{generated}` *(हा ६ अंकी कोड खाली भरा)*")
+
+                # Step 2: Enter OTP and Submit Login
+                if st.session_state.generated_otp:
+                    entered_otp = st.text_input("ईमेलवर आलेला ६-अंकी OTP प्रविष्ट करा:", placeholder="उदा. 123456", max_chars=6)
+                    
+                    if st.button("🚀 पडताळणी करा व वर्गात प्रवेश करा", type="primary", use_container_width=True):
+                        if entered_otp.strip() == st.session_state.generated_otp:
+                            now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                            student_info = {
+                                "नाव": s_name.strip(),
+                                "ईमेल": s_email.strip(),
+                                "इयत्ता": s_class,
+                                "रोल नं": s_roll.strip(),
+                                "लॉगिन वेळ": now_str
+                            }
+                            st.session_state.logged_student = student_info
+                            st.session_state.student_logins.append(student_info)
+                            st.session_state.generated_otp = None
+                            st.success("🎉 ईमेल पडताळणी यशस्वी झाली! अभ्यासक्रम उघडत आहे...")
+                            st.rerun()
+                        else:
+                            st.error("❌ चुकीचा OTP! कृपया योग्य ६-अंकी कोड प्रविष्ट करा.")
+
     else:
         # Student is logged in: Show subjects content
         st.markdown(f"""
         <div class="user-welcome-chip">
-            👋 स्वागत आहे, <b>{st.session_state.logged_student['नाव']}</b> (इयत्ता: {st.session_state.logged_student['इयत्ता']} | रोल नं: {st.session_state.logged_student['रोल नं']})
+            👋 स्वागत आहे, <b>{st.session_state.logged_student['नाव']}</b> | इयत्ता: <b>{st.session_state.logged_student['इयत्ता']}</b> | रोल नं: <b>{st.session_state.logged_student['रोल नं']}</b>
         </div>
         """, unsafe_allow_html=True)
 
@@ -305,26 +351,66 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                 4. **🔀 दुहेरी विस्थापन (Double Displacement):** आयनांची अदलाबदल होऊन अवक्षेप तयार होतो.
                 """)
                 st.divider()
-                st.markdown("### 📝 रासायनिक अभिक्रियांचे प्रकार ओळखण्याचा सराव (प्रश्नपत्रिका)")
-                st.info("💡 **विद्यार्थ्यांसाठी सूचना:** खाली दिलेल्या २० रासायनिक अभिक्रियांचे काळजीपूर्वक निरीक्षण करा आणि अभिक्रिया कोणत्या प्रकारात मोडते (संयोग, अपघटन, विस्थापन की दुहेरी विस्थापन) ते आपल्या वहीत नोंदवा.")
-                
-                # Render clean list of 20 reactions without revealing answers
-                col_rxn1, col_rxn2 = st.columns(2)
-                half = len(REACTIONS_DATA) // 2
-                
-                with col_rxn1:
-                    for r in REACTIONS_DATA[:half]:
-                        with st.container(border=True):
-                            st.markdown(f"**प्रश्न {r['id']}.** खालील रासायनिक अभिक्रियेचा प्रकार ओळखा:")
-                            st.latex(r["reaction"])
-                            st.caption("प्रकार: ______________________________")
 
-                with col_rxn2:
-                    for r in REACTIONS_DATA[half:]:
-                        with st.container(border=True):
-                            st.markdown(f"**प्रश्न {r['id']}.** खालील रासायनिक अभिक्रियेचा प्रकार ओळखा:")
-                            st.latex(r["reaction"])
-                            st.caption("प्रकार: ______________________________")
+                st.markdown("### 📝 रासायनिक अभिक्रियांचे प्रकार ओळखण्याचा सराव (१ ते २०)")
+                st.info("💡 **विद्यार्थ्यांसाठी सूचना:** खालील सर्व २० रासायनिक अभिक्रियांचे काळजीपूर्वक निरीक्षण करा आणि योग्य पर्याय निवडून शेवटी **'सबमिट करा'** बटण दाबा. तुमची उत्तरे थेट शिक्षकांकडे मूल्यांकनासाठी जमा केली जातील.")
+
+                # Student Form - Single Column Layout for 20 Reactions
+                with st.form("reactions_practice_form"):
+                    student_answers = {}
+
+                    for r in REACTIONS_DATA:
+                        st.markdown(f"""
+                        <div class="reaction-card">
+                            <h4 style="color: #1e3a8a; margin-bottom: 0.5rem;">अभिक्रिया क्रमांक {r['id']}:</h4>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.latex(r["reaction"])
+                        
+                        student_answers[r["id"]] = st.radio(
+                            f"अभिक्रिया क्र. {r['id']} चा प्रकार ओळखा:",
+                            REACTION_OPTIONS,
+                            key=f"rxn_q_{r['id']}",
+                            index=None
+                        )
+                        st.markdown("---")
+
+                    submit_reactions = st.form_submit_button("📤 माझी सर्व उत्तरे शिक्षकांकडे जमा करा (Submit Test)", use_container_width=True, type="primary")
+
+                if submit_reactions:
+                    # Evaluate score in background without revealing answers
+                    score = 0
+                    detailed_breakdown = []
+                    
+                    for r in REACTIONS_DATA:
+                        chosen = student_answers.get(r["id"])
+                        is_correct = (chosen == r["correct"])
+                        if is_correct:
+                            score += 1
+                        
+                        detailed_breakdown.append({
+                            "अभिक्रिया क्र": f"अभिक्रिया {r['id']}",
+                            "रासायनिक समीकरण": r["reaction"],
+                            "विद्यार्थ्याचे उत्तर": chosen if chosen else "उत्तर दिले नाही",
+                            "योग्य उत्तर": r["correct"],
+                            "निकाल": "बरोबर ✅" if is_correct else "चूक ❌"
+                        })
+
+                    # Record submission
+                    submission_record = {
+                        "विद्यार्थी": st.session_state.logged_student["नाव"],
+                        "इयत्ता": st.session_state.logged_student["इयत्ता"],
+                        "रोल नं": st.session_state.logged_student["रोल नं"],
+                        "ईमेल": st.session_state.logged_student["ईमेल"],
+                        "तारीख व वेळ": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "गुण": f"{score} / {len(REACTIONS_DATA)}",
+                        "तपशील": detailed_breakdown
+                    }
+                    st.session_state.reaction_submissions.append(submission_record)
+
+                    st.balloons()
+                    st.success(f"🎉 **अभिनंदन, {st.session_state.logged_student['नाव']}!** तुमची सर्व २० उत्तरे शिक्षकांकडे यशस्वीरीत्या सबमिट झाली आहेत.")
+                    st.info("📌 तुमचे गुण आणि सविस्तर मूल्यमापन ऋषिकेश चव्हाण सरांच्या डॅशबोर्डवर नोंदवले गेले आहे.")
 
             with tab2:
                 st.subheader("🪐 धडा १: गुरुत्वाकर्षण (Gravitation) - महत्त्वाचे मुद्दे")
@@ -335,7 +421,7 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
 
         elif subject == "माहिती तंत्रज्ञान (IT/Coding)":
             st.subheader("💻 पायथन कोडिंगच्या मूलभूत संकल्पना")
-            st.code('print("नमस्कार, AI गुरूकुल मध्ये आपले स्वागत आहे!")', language="python")
+            st.code('print("नमस्कार, ऋषिकेश चव्हाण सरांच्या AI क्लासमध्ये आपले स्वागत आहे!")', language="python")
 
 # -------------------------------------------------------------
 # 3. AI LAB
@@ -378,7 +464,6 @@ elif selected_page == "📝 सराव चाचणी (Quiz Zone)":
 elif selected_page == "📬 शंका विचारा (Doubt Box)":
     st.header("📬 शिक्षकांना शंका विचारा (Ask Your Teacher)")
     
-    # Auto-fill name if logged in
     default_name = st.session_state.logged_student["नाव"] if st.session_state.logged_student else ""
     
     with st.form("doubt_box_form"):
@@ -388,15 +473,15 @@ elif selected_page == "📬 शंका विचारा (Doubt Box)":
         send = st.form_submit_button("शंका पाठवा (Submit)")
         
         if send:
-            if s_name and s_question:
+            if s_name.strip() and s_question.strip():
                 now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
                 st.session_state.doubt_records.append({
-                    "विद्यार्थी": s_name,
+                    "विद्यार्थी": s_name.strip(),
                     "इयत्ता": s_class,
-                    "शंका": s_question,
+                    "शंका": s_question.strip(),
                     "वेळ": now_str
                 })
-                st.success("धन्यवाद! तुमची शंका नोंदवली गेली असून शिक्षक डॅशबोर्डवर शिक्षकांना दिसेल.")
+                st.success("धन्यवाद! तुमची शंका नोंदवली गेली असून शिक्षक डॅशबोर्डवर ऋषिकेश चव्हाण सरांना दिसेल.")
             else:
                 st.error("कृपया सर्व माहिती भरा.")
 
@@ -405,9 +490,9 @@ elif selected_page == "📬 शंका विचारा (Doubt Box)":
 # -------------------------------------------------------------
 elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher Admin) 🔐":
     st.header("📊 शिक्षक नियंत्रण कक्ष (Teacher Admin Dashboard)")
-    st.write("विद्यार्थ्यांची उपस्थिती, लॉगिन रेकॉर्ड, रासायनिक अभिक्रियांचे गुण आणि शंकांचे विश्लेषण.")
+    st.write("विद्यार्थ्यांची उपस्थिती, लॉगिन रेकॉर्ड, रासायनिक अभिक्रियांचे निकाल व गुणांचे सविस्तर विश्लेषण.")
 
-    # Password Protection for Teacher
+    # Password Protection for Teacher (Default password text removed)
     teacher_password = st.text_input("🔑 शिक्षकांचा गुप्त पासवर्ड टाका (Teacher PIN):", type="password")
     
     if teacher_password == "gurukul123":
@@ -488,7 +573,7 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
                 st.dataframe(df_results, use_container_width=True)
 
                 st.divider()
-                st.markdown("#### 🔍 वैयक्तिक विद्यार्थ्याचे सविस्तर उत्तरपत्रिका तपासणे:")
+                st.markdown("#### 🔍 वैयक्तिक विद्यार्थ्याची सविस्तर उत्तरपत्रिका तपासणे:")
                 student_names = [f"{s['विद्यार्थी']} (रोल नं: {s['रोल नं']}) - {s['तारीख व वेळ']}" for s in st.session_state.reaction_submissions]
                 chosen_idx = st.selectbox("कोणत्या विद्यार्थ्याची उत्तरपत्रिका तपासायची आहे ते निवडा:", range(len(student_names)), format_func=lambda i: student_names[i])
                 
@@ -523,4 +608,4 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
         st.warning("⚠️ हा भाग केवळ शिक्षकांसाठी राखीव आहे. कृपया वरील बॉक्समध्ये पासवर्ड प्रविष्ट करा.")
 
 st.divider()
-st.markdown("<p style='text-align: center; color: gray;'>© 2026 AI गुरूकुल | ऋषिकेश चव्हाण</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray;'>© 2026 AI गुरूकुल | ऋषिकेश चव्हाण (गणित, विज्ञान आणि AI)</p>", unsafe_allow_html=True)
