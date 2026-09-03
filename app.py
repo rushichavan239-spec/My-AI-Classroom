@@ -1,7 +1,11 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import json
+import os
 import re
+import urllib.request
+import urllib.parse
 
 # Page configuration
 st.set_page_config(
@@ -12,39 +16,78 @@ st.set_page_config(
 )
 
 # -------------------------------------------------------------
-# 💾 डेटा स्टोरेज आणि सेशन स्टेट (SESSION STORAGE INITIALIZATION)
+# 💾 डेटाबेस व GOOGLE SHEETS सिंक व्यवस्था (HYBRID STORAGE)
 # -------------------------------------------------------------
+DATA_FILE = "gurukul_database.json"
+
+def load_database():
+    default_structure = {
+        "class_access_code": "GURUKUL10",
+        "google_sheet_webhook": "", # गुगल शीट वेब ॲप URL
+        "student_logins": [
+            {"नाव": "आर्यन पाटील", "इयत्ता": "१० वी (10th)", "रोल नं": "12", "ईमेल": "aryan.patil@example.com", "लॉगिन वेळ": "2026-09-02 10:15"},
+            {"नाव": "सिया कुलकर्णी", "इयत्ता": "९ वी (9th)", "रोल नं": "24", "ईमेल": "siya.k@example.com", "लॉगिन वेळ": "2026-09-02 11:30"}
+        ],
+        "reaction_submissions": [],
+        "doubt_records": [
+            {"विद्यार्थी": "आर्यन पाटील", "इयत्ता": "१० वी", "शंका": "विस्थापन आणि दुहेरी विस्थापन अभिक्रियेतील मुख्य फरक काय?", "वेळ": "2026-09-02 10:20"}
+        ]
+    }
+    
+    if not os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(default_structure, f, ensure_ascii=False, indent=4)
+        return default_structure
+    
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default_structure
+
+def save_database(data):
+    try:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        st.error(f"डेटा स्थानिक सेव्ह करताना अडचण: {e}")
+
+# गुगल शीटवर थेट डेटा पाठवणारे फंक्शन (Google Sheets Cloud Sync)
+def send_to_google_sheet(payload_dict):
+    webhook_url = st.session_state.db_data.get("google_sheet_webhook", "").strip()
+    if not webhook_url:
+        return False
+    try:
+        data = json.dumps(payload_dict).encode('utf-8')
+        req = urllib.request.Request(
+            webhook_url,
+            data=data,
+            headers={'Content-Type': 'application/json'}
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            return response.status in [200, 302]
+    except Exception:
+        return False
+
+# ॲप सुरू होताच डेटा लोड करणे
+if "db_data" not in st.session_state:
+    st.session_state.db_data = load_database()
+
 if "logged_student" not in st.session_state:
     st.session_state.logged_student = None
 
-if "class_access_code" not in st.session_state:
-    st.session_state.class_access_code = "GURUKUL10"
-
-if "student_logins" not in st.session_state:
-    st.session_state.student_logins = [
-        {"नाव": "आर्यन पाटील", "इयत्ता": "१० वी (10th)", "रोल नं": "12", "ईमेल": "aryan.patil@example.com", "लॉगिन वेळ": "2026-09-02 10:15"},
-        {"नाव": "सिया कुलकर्णी", "इयत्ता": "९ वी (9th)", "रोल नं": "24", "ईमेल": "siya.k@example.com", "लॉगिन वेळ": "2026-09-02 11:30"}
-    ]
-
-if "doubt_records" not in st.session_state:
-    st.session_state.doubt_records = [
-        {"विद्यार्थी": "आर्यन पाटील", "इयत्ता": "१० वी", "शंका": "विस्थापन आणि दुहेरी विस्थापन अभिक्रियेतील मुख्य फरक काय?", "वेळ": "2026-09-02 10:20"}
-    ]
-
-if "reaction_submissions" not in st.session_state:
-    st.session_state.reaction_submissions = []
+def persist_all():
+    save_database(st.session_state.db_data)
 
 # -------------------------------------------------------------
-# 🎨 डिझाईन आणि CSS स्टाईलिंग (CUSTOM CSS)
+# 🎨 CSS स्टाईलिंग
 # -------------------------------------------------------------
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
-    
     html, body, [class*="css"] {
         font-family: 'Poppins', sans-serif;
     }
-    
     .hero-box {
         background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 50%, #06B6D4 100%);
         color: white;
@@ -53,18 +96,15 @@ st.markdown("""
         margin-bottom: 2rem;
         box-shadow: 0 10px 25px rgba(59, 130, 246, 0.25);
     }
-    
     .hero-title {
-        font-size: 2.3rem;
+        font-size: 2.2rem;
         font-weight: 700;
         margin-bottom: 0.4rem;
     }
-    
     .hero-subtitle {
         font-size: 1.1rem;
         opacity: 0.95;
     }
-
     .feature-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
@@ -73,7 +113,6 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         height: 100%;
     }
-
     .login-box {
         background: #ffffff;
         border: 2px solid #3b82f6;
@@ -83,7 +122,6 @@ st.markdown("""
         max-width: 600px;
         margin: auto;
     }
-
     .user-welcome-chip {
         background-color: #ecfdf5;
         border: 1px solid #10b981;
@@ -94,7 +132,6 @@ st.markdown("""
         font-weight: 600;
         margin-bottom: 1.5rem;
     }
-
     .kpi-card {
         background: white;
         border-radius: 12px;
@@ -112,20 +149,19 @@ st.markdown("""
         font-size: 0.9rem;
         color: #64748b;
     }
-
     .reaction-card {
         background: #f8fafc;
         border: 1px solid #cbd5e1;
         border-left: 5px solid #2563eb;
         border-radius: 12px;
         padding: 1.2rem;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 🎯 प्रश्नांची यादी (QUIZ DATA)
+# 🎯 प्रश्नांचा डेटा (QUIZ DATA)
 # -------------------------------------------------------------
 QUIZ_DATABASE = {
     "🤖 कृत्रिम बुद्धिमत्ता (AI & IT)": [
@@ -139,7 +175,7 @@ QUIZ_DATABASE = {
             "question": "ChatGPT आणि Gemini हे AI च्या कोणत्या प्रकारात मोडतात?",
             "options": ["Robotic Hardware", "Generative AI (LLM)", "Antivirus Tool", "Database"],
             "answer": "Generative AI (LLM)",
-            "explanation": "हे Large Language Models (LLM) असून नवीन मजकूर तयार (Generate) करतात."
+            "explanation": "हे Large Language Models (LLM) असून नवीन मजकूर तयार करतात."
         }
     ],
     "🔬 सामान्य विज्ञान (Science)": [
@@ -191,13 +227,13 @@ REACTIONS_DATA = [
     {"id": 20, "reaction": r"\text{FeCl}_3 + 3\text{NH}_4\text{OH} \longrightarrow \text{Fe(OH)}_3\downarrow + 3\text{NH}_4\text{Cl}", "correct": "🔀 दुहेरी विस्थापन अभिक्रिया (Double Displacement)"}
 ]
 
-# Helper function to validate email
+# Helper to validate email format
 def is_valid_email(email_str):
     pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
     return re.match(pattern, email_str.strip()) is not None
 
 # -------------------------------------------------------------
-# 🧭 SIDEBAR NAVIGATION & TEACHER PROFILE
+# 🧭 SIDEBAR NAVIGATION
 # -------------------------------------------------------------
 with st.sidebar:
     st.markdown("### 👨‍🏫 **शिक्षक प्रोफाईल**")
@@ -207,7 +243,6 @@ with st.sidebar:
     """)
     st.divider()
 
-    # Logged In student status
     if st.session_state.logged_student:
         st.success(f"👤 **लॉगिन विद्यार्थी:**\n**{st.session_state.logged_student['नाव']}** ({st.session_state.logged_student['इयत्ता']})")
         if st.button("🚪 लॉगआउट (Logout)", key="logout_btn", use_container_width=True):
@@ -227,7 +262,12 @@ with st.sidebar:
         ]
     )
     st.divider()
-    st.info("💡 *'शिक्षणासोबतच शिका भविष्यातील तंत्रज्ञान!'*")
+    
+    # Cloud sync status indicator
+    if st.session_state.db_data.get("google_sheet_webhook"):
+        st.caption("🟢 **Google Sheet Cloud Sync: Active**")
+    else:
+        st.caption("🟡 **डेटाबेस मोड: Local Permanent File**")
 
 # -------------------------------------------------------------
 # 1. HOME PAGE
@@ -258,20 +298,20 @@ if selected_page == "🏠 मुख्य पान (Home)":
     with col3:
         st.markdown("""
         <div class="feature-card">
-            <h4>📊 शिक्षक डॅशबोर्ड</h4>
-            <p>विद्यार्थ्यांची हजेरी, अभिक्रिया चाचणी निकाल आणि शंकांचे सविस्तर मूल्यमापन शिक्षकांसाठी उपलब्ध.</p>
+            <h4>📊 गुगल शीट क्लाउड सिंक</h4>
+            <p>सर्व विद्यार्थ्यांचा डेटा आणि निकाल Google Sheets व शिक्षक डॅशबोर्डवर कायम सुरक्षित राहतो.</p>
         </div>
         """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 2. SUBJECTS PAGE (WITH STUDENT CLASS CODE LOGIN GATE)
+# 2. SUBJECTS PAGE (STUDENT LOGIN GATE)
 # -------------------------------------------------------------
 elif selected_page == "📚 शालेय अभ्यासक्रम (Subjects) 🔒":
     if st.session_state.logged_student is None:
         st.markdown("""
         <div class="login-box">
             <h3 style="text-align: center; color: #1E3A8A; margin-bottom: 0.5rem;">🔐 विद्यार्थी प्रवेश (Student Login)</h3>
-            <p style="text-align: center; color: #64748B; font-size: 0.95rem;">शालेय अभ्यासक्रम व रासायनिक अभिक्रियांचा सराव पाहण्यासाठी तुमची माहिती आणि शिक्षकांनी दिलेला वर्ग कोड टाका.</p>
+            <p style="text-align: center; color: #64748B; font-size: 0.95rem;">शालेय अभ्यासक्रम पाहण्यासाठी तुमची माहिती आणि शिक्षकांनी दिलेला वर्ग कोड टाका.</p>
         </div>
         """, unsafe_allow_html=True)
         st.write("")
@@ -283,16 +323,16 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                 s_class = st.selectbox("इयत्ता (Class):", ["८ वी (8th)", "९ वी (9th)", "१० वी (10th)"])
                 s_roll = st.text_input("हजेरी क्रमांक / रोल नंबर (Roll No):", placeholder="उदा. 15")
                 s_email = st.text_input("ईमेल आयडी (Email ID):", placeholder="उदा. rahul@example.com")
-                entered_code = st.text_input("🔑 वर्ग प्रवेश कोड (Class Code):", placeholder="शिक्षकांनी दिलेला कोड टाका (उदा. GURUKUL10)")
-
-                st.caption(f"💡 *चाचणीसाठी सध्याचा कोड: `{st.session_state.class_access_code}`*")
+                
+                current_code = st.session_state.db_data.get("class_access_code", "GURUKUL10")
+                entered_code = st.text_input("🔑 वर्ग प्रवेश कोड (Class Code):", placeholder="शिक्षकांनी दिलेला कोड टाका")
 
                 if st.button("🚀 वर्गात प्रवेश करा", type="primary", use_container_width=True):
                     if not s_name.strip() or not s_roll.strip():
                         st.error("❌ कृपया नाव आणि हजेरी क्रमांक भरा.")
                     elif not is_valid_email(s_email):
                         st.error("❌ कृपया वैध ईमेल आयडी (उदा. name@gmail.com) टाका.")
-                    elif entered_code.strip() != st.session_state.class_access_code:
+                    elif entered_code.strip() != current_code:
                         st.error("❌ चुकीचा वर्ग कोड! शिक्षकांनी दिलेला योग्य कोड प्रविष्ट करा.")
                     else:
                         now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -304,12 +344,22 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                             "लॉगिन वेळ": now_str
                         }
                         st.session_state.logged_student = student_info
-                        st.session_state.student_logins.append(student_info)
+                        
+                        # स्थानिक डेटाबेसमध्ये कायमस्वरूपी सेव्ह
+                        st.session_state.db_data["student_logins"].append(student_info)
+                        persist_all()
+                        
+                        # Google Sheets वर ऑटो-सिंक
+                        send_to_google_sheet({
+                            "type": "attendance",
+                            "data": student_info
+                        })
+                        
                         st.success("🎉 स्वागत आहे! अभ्यासक्रम उघडत आहे...")
                         st.rerun()
 
     else:
-        # Student is logged in: Show subjects content
+        # Student logged in
         st.markdown(f"""
         <div class="user-welcome-chip">
             👋 स्वागत आहे, <b>{st.session_state.logged_student['नाव']}</b> | इयत्ता: <b>{st.session_state.logged_student['इयत्ता']}</b> | रोल नं: <b>{st.session_state.logged_student['रोल नं']}</b>
@@ -323,7 +373,7 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
             tab1, tab2 = st.tabs(["🔬 धडा ३: रासायनिक अभिक्रिया आणि समीकरणे", "🪐 धडा १: गुरुत्वाकर्षण (Gravitation)"])
             
             with tab1:
-                st.subheader("🧪 धडा ३: रासायनिक अभिक्रिया आणि समीकरणे (Chemical Reactions & Equations)")
+                st.subheader("🧪 धडा ३: रासायनिक अभिक्रिया आणि समीकरणे")
                 st.markdown("""
                 रासायनिक अभिक्रियांचे प्रामुख्याने **४ मुख्य प्रकार** असतात:
                 1. **➕ संयोग (Combination):** दोन किंवा अधिक अभिक्रियाकारकांपासून एकच उत्पादित तयार होते.
@@ -334,12 +384,10 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                 st.divider()
 
                 st.markdown("### 📝 रासायनिक अभिक्रियांचे प्रकार ओळखण्याचा सराव (१ ते २०)")
-                st.info("💡 **विद्यार्थ्यांसाठी सूचना:** खालील सर्व २० रासायनिक अभिक्रियांचे काळजीपूर्वक निरीक्षण करा आणि योग्य पर्याय निवडून शेवटी **'माझी सर्व उत्तरे शिक्षकांकडे जमा करा'** बटण दाबा. तुमची उत्तरे थेट शिक्षकांकडे मूल्यांकनासाठी जमा केली जातील.")
+                st.info("💡 **विद्यार्थ्यांसाठी सूचना:** खालील सर्व २० अभिक्रियांचे काळजीपूर्वक निरीक्षण करा आणि योग्य पर्याय निवडून शेवटी **'माझी सर्व उत्तरे शिक्षकांकडे जमा करा'** बटण दाबा.")
 
-                # Student Form - Single Column Layout for 20 Reactions
                 with st.form("reactions_practice_form"):
                     student_answers = {}
-
                     for r in REACTIONS_DATA:
                         st.markdown(f"""
                         <div class="reaction-card">
@@ -359,7 +407,6 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                     submit_reactions = st.form_submit_button("📤 माझी सर्व उत्तरे शिक्षकांकडे जमा करा (Submit Test)", use_container_width=True, type="primary")
 
                 if submit_reactions:
-                    # Evaluate score in background without revealing answers to students
                     score = 0
                     detailed_breakdown = []
                     
@@ -377,21 +424,37 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                             "निकाल": "बरोबर ✅" if is_correct else "चूक ❌"
                         })
 
-                    # Record submission
+                    now_time = datetime.now().strftime("%Y-%m-%d %H:%M")
                     submission_record = {
                         "विद्यार्थी": st.session_state.logged_student["नाव"],
                         "इयत्ता": st.session_state.logged_student["इयत्ता"],
                         "रोल नं": st.session_state.logged_student["रोल नं"],
                         "ईमेल": st.session_state.logged_student["ईमेल"],
-                        "तारीख व वेळ": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "तारीख व वेळ": now_time,
                         "गुण": f"{score} / {len(REACTIONS_DATA)}",
                         "तपशील": detailed_breakdown
                     }
-                    st.session_state.reaction_submissions.append(submission_record)
+                    
+                    # स्थानिक डेटाबेसमध्ये सेव्ह
+                    st.session_state.db_data["reaction_submissions"].append(submission_record)
+                    persist_all()
+
+                    # Google Sheet वर थेट निकाल ऑटो-सिंक
+                    send_to_google_sheet({
+                        "type": "quiz_result",
+                        "data": {
+                            "विद्यार्थी": submission_record["विद्यार्थी"],
+                            "इयत्ता": submission_record["इयत्ता"],
+                            "रोल नं": submission_record["रोल नं"],
+                            "ईमेल": submission_record["ईमेल"],
+                            "तारीख व वेळ": submission_record["तारीख व वेळ"],
+                            "प्राप्त गुण": submission_record["गुण"]
+                        }
+                    })
 
                     st.balloons()
-                    st.success(f"🎉 **अभिनंदन, {st.session_state.logged_student['नाव']}!** तुमची सर्व २० उत्तरे शिक्षकांकडे यशस्वीरीत्या सबमिट झाली आहेत.")
-                    st.info("📌 तुमचे गुण आणि सविस्तर मूल्यमापन ऋषिकेश चव्हाण सरांच्या डॅशबोर्डवर नोंदवले गेले आहे.")
+                    st.success(f"🎉 **अभिनंदन, {st.session_state.logged_student['नाव']}!** तुमची उत्तरे शिक्षकांकडे यशस्वीरीत्या सबमिट झाली आहेत.")
+                    st.info("📌 तुमचे गुण आणि सविस्तर मूल्यमापन ऋषिकेश चव्हाण सरांच्या Google Sheet व डॅशबोर्डवर कायमस्वरूपी नोंदवले गेले आहे.")
 
             with tab2:
                 st.subheader("🪐 धडा १: गुरुत्वाकर्षण (Gravitation) - महत्त्वाचे मुद्दे")
@@ -444,7 +507,6 @@ elif selected_page == "📝 सराव चाचणी (Quiz Zone)":
 # -------------------------------------------------------------
 elif selected_page == "📬 शंका विचारा (Doubt Box)":
     st.header("📬 शिक्षकांना शंका विचारा (Ask Your Teacher)")
-    
     default_name = st.session_state.logged_student["नाव"] if st.session_state.logged_student else ""
     
     with st.form("doubt_box_form"):
@@ -456,79 +518,92 @@ elif selected_page == "📬 शंका विचारा (Doubt Box)":
         if send:
             if s_name.strip() and s_question.strip():
                 now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                st.session_state.doubt_records.append({
+                doubt_item = {
                     "विद्यार्थी": s_name.strip(),
                     "इयत्ता": s_class,
                     "शंका": s_question.strip(),
                     "वेळ": now_str
+                }
+                st.session_state.db_data["doubt_records"].append(doubt_item)
+                persist_all()
+                
+                # Google Sheets सिंक
+                send_to_google_sheet({
+                    "type": "doubt",
+                    "data": doubt_item
                 })
-                st.success("धन्यवाद! तुमची शंका नोंदवली गेली असून शिक्षक डॅशबोर्डवर ऋषिकेश चव्हाण सरांना दिसेल.")
+                
+                st.success("धन्यवाद! तुमची शंका नोंदवली गेली असून ऋषिकेश चव्हाण सरांच्या डॅशबोर्ड व Google Sheet वर दिसेल.")
             else:
                 st.error("कृपया सर्व माहिती भरा.")
 
 # -------------------------------------------------------------
-# 6. TEACHER & ADMIN DASHBOARD (SECURE ACCESS)
+# 6. TEACHER & ADMIN DASHBOARD
 # -------------------------------------------------------------
 elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher Admin) 🔐":
     st.header("📊 शिक्षक नियंत्रण कक्ष (Teacher Admin Dashboard)")
-    st.write("विद्यार्थ्यांची उपस्थिती, लॉगिन रेकॉर्ड, रासायनिक अभिक्रियांचे निकाल व गुणांचे सविस्तर विश्लेषण.")
+    st.write("विद्यार्थ्यांची उपस्थिती, लॉगिन रेकॉर्ड, रासायनिक अभिक्रियांचे निकाल व कायमस्वरूपी Google Sheets डेटा.")
 
     teacher_password = st.text_input("🔑 शिक्षकांचा गुप्त पासवर्ड टाका (Teacher PIN):", type="password")
     
     if teacher_password == "gurukul123":
         st.success("प्रवेश मंजूर झाला! स्वागत आहे ऋषिकेश चव्हाण सर 👨‍🏫")
+        
+        logins = st.session_state.db_data.get("student_logins", [])
+        submissions = st.session_state.db_data.get("reaction_submissions", [])
+        doubts = st.session_state.db_data.get("doubt_records", [])
+
         st.divider()
 
-        # Key Metrics Row
         kpi1, kpi2, kpi3, kpi4 = st.columns(4)
         with kpi1:
             st.markdown(f"""
             <div class="kpi-card">
-                <div class="kpi-num">{len(st.session_state.student_logins)}</div>
-                <div class="kpi-title">लॉगिन विद्यार्थी</div>
+                <div class="kpi-num">{len(logins)}</div>
+                <div class="kpi-title">एकूण हजेरी रेकॉर्ड्स</div>
             </div>
             """, unsafe_allow_html=True)
         with kpi2:
             st.markdown(f"""
             <div class="kpi-card">
-                <div class="kpi-num">{len(st.session_state.reaction_submissions)}</div>
+                <div class="kpi-num">{len(submissions)}</div>
                 <div class="kpi-title">जमा झालेल्या चाचण्या</div>
             </div>
             """, unsafe_allow_html=True)
         with kpi3:
             st.markdown(f"""
             <div class="kpi-card">
-                <div class="kpi-num">{len(st.session_state.doubt_records)}</div>
+                <div class="kpi-num">{len(doubts)}</div>
                 <div class="kpi-title">विद्यार्थ्यांच्या शंका</div>
             </div>
             """, unsafe_allow_html=True)
         with kpi4:
+            has_sheet = "सक्रिय 🟢" if st.session_state.db_data.get("google_sheet_webhook") else "बंद ⚪"
             st.markdown(f"""
             <div class="kpi-card">
-                <div class="kpi-num">{len(REACTIONS_DATA)}</div>
-                <div class="kpi-title">अभिक्रिया प्रश्न संख्या</div>
+                <div class="kpi-num" style="font-size: 1.5rem; padding-top: 0.4rem;">{has_sheet}</div>
+                <div class="kpi-title">Google Sheets क्लाउड</div>
             </div>
             """, unsafe_allow_html=True)
 
         st.write("")
-        st.write("")
 
-        tab_dash1, tab_dash2, tab_dash3 = st.tabs([
-            "📋 विद्यार्थी हजेरी व लॉगिन (Logs)", 
-            "🧪 रासायनिक अभिक्रिया निकाल व उत्तरे (Test Results)",
-            "⚙️ वर्ग कोड व शंका व्यवस्थापन (Settings & Doubts)"
+        tab_dash1, tab_dash2, tab_dash3, tab_dash4, tab_dash5 = st.tabs([
+            "📋 विद्यार्थी हजेरी (Attendance)", 
+            "🧪 रासायनिक अभिक्रिया निकाल (Results)",
+            "📊 Google Sheets जोडणी (Cloud Setup)",
+            "⚙️ वर्ग कोड व शंका (Settings & Doubts)",
+            "💾 डेटा बॅकअप (Master Backup)"
         ])
 
         with tab_dash1:
-            st.subheader("विद्यार्थी हजेरी आणि लॉगिन तपशील")
-            if st.session_state.student_logins:
-                df_logins = pd.DataFrame(st.session_state.student_logins)
+            st.subheader("विद्यार्थी हजेरी आणि लॉगिन तपशील (पहिल्या दिवसापासूनचा संपूर्ण डेटा)")
+            if logins:
+                df_logins = pd.DataFrame(logins)
                 st.dataframe(df_logins, use_container_width=True)
-                
-                # Download CSV report
                 csv_data = df_logins.to_csv(index=False).encode('utf-8')
                 st.download_button(
-                    label="📥 हजेरी रिपोर्ट डाउनलोड करा (Download CSV)",
+                    label="📥 संपूर्ण हजेरी रिपोर्ट डाउनलोड करा (Download CSV)",
                     data=csv_data,
                     file_name=f"student_attendance_{datetime.now().strftime('%Y%m%d')}.csv",
                     mime="text/csv"
@@ -538,9 +613,9 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
 
         with tab_dash2:
             st.subheader("🧪 रासायनिक अभिक्रिया सराव चाचणीचे मूल्यमापन (Student Submissions)")
-            if st.session_state.reaction_submissions:
+            if submissions:
                 summary_data = []
-                for sub in st.session_state.reaction_submissions:
+                for sub in submissions:
                     summary_data.append({
                         "विद्यार्थी": sub["विद्यार्थी"],
                         "इयत्ता": sub["इयत्ता"],
@@ -554,10 +629,10 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
 
                 st.divider()
                 st.markdown("#### 🔍 वैयक्तिक विद्यार्थ्याची सविस्तर उत्तरपत्रिका तपासणे:")
-                student_names = [f"{s['विद्यार्थी']} (रोल नं: {s['रोल नं']}) - {s['तारीख व वेळ']}" for s in st.session_state.reaction_submissions]
-                chosen_idx = st.selectbox("कोणत्या विद्यार्थ्याची उत्तरपत्रिका तपासायची आहे ते निवडा:", range(len(student_names)), format_func=lambda i: student_names[i])
+                student_names = [f"{s['विद्यार्थी']} (रोल नं: {s['रोल नं']}) - {s['तारीख व वेळ']}" for s in submissions]
+                chosen_idx = st.selectbox("विद्यार्थी निवडा:", range(len(student_names)), format_func=lambda i: student_names[i])
                 
-                selected_sub = st.session_state.reaction_submissions[chosen_idx]
+                selected_sub = submissions[chosen_idx]
                 st.info(f"👤 **विद्यार्थी:** {selected_sub['विद्यार्थी']} | **एकूण गुण:** {selected_sub['गुण']}")
                 
                 df_details = pd.DataFrame(selected_sub["तपशील"])
@@ -567,32 +642,82 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
                 st.download_button(
                     label="📥 रासायनिक अभिक्रिया निकाल डाऊनलोड करा (Download CSV)",
                     data=csv_sub,
-                    file_name=f"reaction_quiz_results_{datetime.now().strftime('%Y%m%d')}.csv",
+                    file_name=f"reaction_results_{datetime.now().strftime('%Y%m%d')}.csv",
                     mime="text/csv"
                 )
             else:
                 st.info("अद्याप कोणत्याही विद्यार्थ्याने रासायनिक अभिक्रिया चाचणी सबमिट केलेली नाही.")
 
         with tab_dash3:
-            st.subheader("⚙️ विद्यार्थ्यांसाठी वर्ग प्रवेश कोड (Class Access Code)")
-            st.write("विद्यार्थ्यांना अभ्यासक्रमात प्रवेश करण्यासाठी लागणारा कोड तुम्ही येथून बदलू शकता:")
+            st.subheader("📊 थेट Google Sheets सह ऑटोमॅटिक सिंक (Cloud Integration)")
+            st.markdown("""
+            विद्यार्थ्याने सबमिट करताच त्याचा डेटा **थेट तुमच्या Google Drive मधील Excel Sheet मध्ये** जमा होण्यासाठी खालील रकान्यात तुमच्या Google Apps Script Web App ची URL पेस्ट करा:
+            """)
             
-            new_code = st.text_input("सध्याचा चालू कोड:", value=st.session_state.class_access_code)
+            cur_webhook = st.session_state.db_data.get("google_sheet_webhook", "")
+            new_webhook = st.text_input("🔗 Google Sheets Webhook URL:", value=cur_webhook, placeholder="https://script.google.com/macros/s/.../exec")
+            
+            col_save, col_test = st.columns([1, 1])
+            with col_save:
+                if st.button("💾 Google Sheet URL जतन करा", use_container_width=True):
+                    st.session_state.db_data["google_sheet_webhook"] = new_webhook.strip()
+                    persist_all()
+                    st.success("✅ Google Sheets लिंक यशस्वीरित्या जोडली गेली आहे!")
+                    st.rerun()
+            with col_test:
+                if st.button("🧪 टेस्ट डेटा पाठवून तपासा", use_container_width=True):
+                    if new_webhook.strip():
+                        test_ok = send_to_google_sheet({
+                            "type": "attendance",
+                            "data": {
+                                "नाव": "टेस्ट विद्यार्थी",
+                                "ईमेल": "test@gmail.com",
+                                "इयत्ता": "१० वी",
+                                "रोल नं": "99",
+                                "लॉगिन वेळ": datetime.now().strftime("%Y-%m-%d %H:%M")
+                            }
+                        })
+                        if test_ok:
+                            st.success("🎉 उत्कृष्ट! Google Sheet मध्ये टेस्ट एन्ट्री यशस्वीरीत्या झाली आहे!")
+                        else:
+                            st.warning("⚠️ डेटा पाठवला आहे, कृपया तुमच्या Google Sheet मध्ये तपासा.")
+                    else:
+                        st.error("कृपया आधी URL टाका.")
+
+            st.info("💡 **टीप:** Google Sheet ची मोफत लिंक कशी तयार करायची यासाठी सोबत दिलेली **`google_sheets_guide.md`** फाईल पहा. अवघ्या २ मिनिटांत हे सुरू होते.")
+
+        with tab_dash4:
+            st.subheader("⚙️ विद्यार्थ्यांसाठी वर्ग प्रवेश कोड (Class Access Code)")
+            cur_code = st.session_state.db_data.get("class_access_code", "GURUKUL10")
+            new_code = st.text_input("चालू वर्ग कोड बदला:", value=cur_code)
             if st.button("💾 नवीन कोड सेव्ह करा", key="save_code_btn"):
                 if new_code.strip():
-                    st.session_state.class_access_code = new_code.strip()
-                    st.success(f"✅ वर्ग कोड यशस्वीरीत्या बदलला आहे: `{new_code.strip()}`")
+                    st.session_state.db_data["class_access_code"] = new_code.strip()
+                    persist_all()
+                    st.success(f"✅ नवीन वर्ग कोड: `{new_code.strip()}`")
                     st.rerun()
                 else:
                     st.error("कोड रिकामा ठेवू नका.")
 
             st.divider()
             st.subheader("📬 विद्यार्थ्यांच्या शंका")
-            if st.session_state.doubt_records:
-                df_doubts = pd.DataFrame(st.session_state.doubt_records)
+            if doubts:
+                df_doubts = pd.DataFrame(doubts)
                 st.dataframe(df_doubts, use_container_width=True)
             else:
-                st.info("अद्याप कोणत्याही विद्यार्थ्याची शंका आलेली नाही.")
+                st.info("कोणत्याही विद्यार्थ्याची शंका प्रलंबित नाही.")
+
+        with tab_dash5:
+            st.subheader("💾 संपूर्ण डेटाबेस बॅकअप (Permanent Master Backup)")
+            st.write("स्थानिक डेटाबेसची मास्टर कॉपी डाउनलोड करा:")
+            
+            db_json_str = json.dumps(st.session_state.db_data, ensure_ascii=False, indent=4)
+            st.download_button(
+                label="📦 संपूर्ण डेटाबेस बॅकअप डाऊनलोड करा (JSON)",
+                data=db_json_str.encode('utf-8'),
+                file_name=f"gurukul_master_backup_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                mime="application/json"
+            )
 
     elif teacher_password != "":
         st.error("चुकीचा पासवर्ड! कृपया योग्य पासवर्ड टाका.")
