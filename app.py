@@ -536,7 +536,7 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
         tab_dash1, tab_dash2, tab_dash3 = st.tabs([
             "📋 विद्यार्थी हजेरी व लॉगिन (Logs)", 
             "🧪 रासायनिक अभिक्रिया निकाल व उत्तरे (Test Results)",
-            "📬 आलेल्या शंका (Student Doubts)"
+            "📬 आलेल्या शंका & वर्ग कोड व्यवस्थापन (Doubts & Settings)"
         ])
 
         with tab_dash1:
@@ -601,6 +601,19 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
                 st.dataframe(df_doubts, use_container_width=True)
             else:
                 st.info("अद्याप कोणत्याही विद्यार्थ्याची शंका आलेली नाही.")
+
+            st.divider()
+            st.subheader("⚙️ विद्यार्थ्यांसाठी वर्ग कोड (Class Code) व्यवस्थापन")
+            st.write("विद्यार्थ्यांना लॉगिन करताना लागणारा कोड तुम्ही येथून बदलू शकता:")
+            
+            new_code = st.text_input("सध्याचा चालू कोड:", value=st.session_state.class_access_code)
+            if st.button("💾 नवीन कोड सेव्ह करा", key="save_code_btn"):
+                if new_code.strip():
+                    st.session_state.class_access_code = new_code.strip()
+                    st.success(f"✅ वर्ग कोड यशस्वीरीत्या बदलला आहे: `{new_code.strip()}`")
+                    st.rerun()
+                else:
+                    st.error("कोड रिकामा ठेवू नका.")
 
     elif teacher_password != "":
         st.error("चुकीचा पासवर्ड! कृपया योग्य पासवर्ड टाका.")
