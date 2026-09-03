@@ -216,8 +216,6 @@ with st.sidebar:
         st.success(f"👤 **लॉगिन विद्यार्थी:**\n**{st.session_state.logged_student['नाव']}** ({st.session_state.logged_student['इयत्ता']})")
         if st.button("🚪 लॉगआउट (Logout)", key="logout_btn", use_container_width=True):
             st.session_state.logged_student = None
-            st.session_state.generated_otp = None
-            st.session_state.otp_sent_to = ""
             st.rerun()
         st.divider()
 
