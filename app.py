@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import re
-import random
 
 # Page configuration
 st.set_page_config(
@@ -18,6 +17,9 @@ st.set_page_config(
 if "logged_student" not in st.session_state:
     st.session_state.logged_student = None
 
+if "class_access_code" not in st.session_state:
+    st.session_state.class_access_code = "GURUKUL10"
+
 if "student_logins" not in st.session_state:
     st.session_state.student_logins = [
         {"नाव": "आर्यन पाटील", "इयत्ता": "१० वी (10th)", "रोल नं": "12", "ईमेल": "aryan.patil@example.com", "लॉगिन वेळ": "2026-09-02 10:15"},
@@ -31,12 +33,6 @@ if "doubt_records" not in st.session_state:
 
 if "reaction_submissions" not in st.session_state:
     st.session_state.reaction_submissions = []
-
-if "generated_otp" not in st.session_state:
-    st.session_state.generated_otp = None
-
-if "otp_sent_to" not in st.session_state:
-    st.session_state.otp_sent_to = ""
 
 # -------------------------------------------------------------
 # 🎨 डिझाईन आणि CSS स्टाईलिंग (CUSTOM CSS)
@@ -249,7 +245,7 @@ if selected_page == "🏠 मुख्य पान (Home)":
         st.markdown("""
         <div class="feature-card">
             <h4>📖 सुरक्षित अभ्यासक्रम</h4>
-            <p>विद्यार्थी ईमेल OTP सह सुरक्षित लॉगिन करून रासायनिक अभिक्रिया व नोट्सचा अभ्यास करू शकतात.</p>
+            <p>विद्यार्थी वर्ग कोडसह सुरक्षित लॉगिन करून रासायनिक अभिक्रिया व नोट्सचा अभ्यास करू शकतात.</p>
         </div>
         """, unsafe_allow_html=True)
     with col2:
@@ -268,14 +264,14 @@ if selected_page == "🏠 मुख्य पान (Home)":
         """, unsafe_allow_html=True)
 
 # -------------------------------------------------------------
-# 2. SUBJECTS PAGE (WITH STUDENT OTP LOGIN GATE)
+# 2. SUBJECTS PAGE (WITH STUDENT CLASS CODE LOGIN GATE)
 # -------------------------------------------------------------
 elif selected_page == "📚 शालेय अभ्यासक्रम (Subjects) 🔒":
     if st.session_state.logged_student is None:
         st.markdown("""
         <div class="login-box">
             <h3 style="text-align: center; color: #1E3A8A; margin-bottom: 0.5rem;">🔐 विद्यार्थी प्रवेश (Student Login)</h3>
-            <p style="text-align: center; color: #64748B; font-size: 0.95rem;">शालेय अभ्यासक्रम व रासायनिक अभिक्रियांचा सराव पाहण्यासाठी कृपया तुमची माहिती व वैध ईमेल नोंदवा.</p>
+            <p style="text-align: center; color: #64748B; font-size: 0.95rem;">शालेय अभ्यासक्रम व रासायनिक अभिक्रियांचा सराव पाहण्यासाठी तुमची माहिती आणि शिक्षकांनी दिलेला वर्ग कोड टाका.</p>
         </div>
         """, unsafe_allow_html=True)
         st.write("")
@@ -286,44 +282,31 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                 s_name = st.text_input("विद्यार्थ्याचे पूर्ण नाव (Full Name):", placeholder="उदा. राहुल सचिन पाटील")
                 s_class = st.selectbox("इयत्ता (Class):", ["८ वी (8th)", "९ वी (9th)", "१० वी (10th)"])
                 s_roll = st.text_input("हजेरी क्रमांक / रोल नंबर (Roll No):", placeholder="उदा. 15")
-                s_email = st.text_input("वैध ईमेल आयडी (Email ID):", placeholder="उदा. rahul@example.com")
+                s_email = st.text_input("ईमेल आयडी (Email ID):", placeholder="उदा. rahul@example.com")
+                entered_code = st.text_input("🔑 वर्ग प्रवेश कोड (Class Code):", placeholder="शिक्षकांनी दिलेला कोड टाका (उदा. GURUKUL10)")
 
-                # Step 1: Request OTP
-                col_otp_btn, col_otp_dummy = st.columns([1.5, 1])
-                with col_otp_btn:
-                    if st.button("📩 ईमेलवर OTP मिळवा (Send OTP)", use_container_width=True):
-                        if not s_name.strip() or not s_roll.strip():
-                            st.error("❌ कृपया आधी तुमचे नाव आणि हजेरी क्रमांक भरा.")
-                        elif not is_valid_email(s_email):
-                            st.error("❌ अवैध ईमेल! कृपया योग्य ईमेल आयडी (उदा. user@gmail.com) प्रविष्ट करा.")
-                        else:
-                            generated = str(random.randint(100000, 999999))
-                            st.session_state.generated_otp = generated
-                            st.session_state.otp_sent_to = s_email.strip()
-                            st.success(f"✅ पडताळणी कोड (OTP) तयार झाला आहे!")
-                            st.info(f"🔑 **चाचणीसाठी OTP:** `{generated}` *(हा ६ अंकी कोड खाली भरा)*")
+                st.caption(f"💡 *चाचणीसाठी सध्याचा कोड: `{st.session_state.class_access_code}`*")
 
-                # Step 2: Enter OTP and Submit Login
-                if st.session_state.generated_otp:
-                    entered_otp = st.text_input("ईमेलवर आलेला ६-अंकी OTP प्रविष्ट करा:", placeholder="उदा. 123456", max_chars=6)
-                    
-                    if st.button("🚀 पडताळणी करा व वर्गात प्रवेश करा", type="primary", use_container_width=True):
-                        if entered_otp.strip() == st.session_state.generated_otp:
-                            now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-                            student_info = {
-                                "नाव": s_name.strip(),
-                                "ईमेल": s_email.strip(),
-                                "इयत्ता": s_class,
-                                "रोल नं": s_roll.strip(),
-                                "लॉगिन वेळ": now_str
-                            }
-                            st.session_state.logged_student = student_info
-                            st.session_state.student_logins.append(student_info)
-                            st.session_state.generated_otp = None
-                            st.success("🎉 ईमेल पडताळणी यशस्वी झाली! अभ्यासक्रम उघडत आहे...")
-                            st.rerun()
-                        else:
-                            st.error("❌ चुकीचा OTP! कृपया योग्य ६-अंकी कोड प्रविष्ट करा.")
+                if st.button("🚀 वर्गात प्रवेश करा", type="primary", use_container_width=True):
+                    if not s_name.strip() or not s_roll.strip():
+                        st.error("❌ कृपया नाव आणि हजेरी क्रमांक भरा.")
+                    elif not is_valid_email(s_email):
+                        st.error("❌ कृपया वैध ईमेल आयडी (उदा. name@gmail.com) टाका.")
+                    elif entered_code.strip() != st.session_state.class_access_code:
+                        st.error("❌ चुकीचा वर्ग कोड! शिक्षकांनी दिलेला योग्य कोड प्रविष्ट करा.")
+                    else:
+                        now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+                        student_info = {
+                            "नाव": s_name.strip(),
+                            "ईमेल": s_email.strip(),
+                            "इयत्ता": s_class,
+                            "रोल नं": s_roll.strip(),
+                            "लॉगिन वेळ": now_str
+                        }
+                        st.session_state.logged_student = student_info
+                        st.session_state.student_logins.append(student_info)
+                        st.success("🎉 स्वागत आहे! अभ्यासक्रम उघडत आहे...")
+                        st.rerun()
 
     else:
         # Student is logged in: Show subjects content
@@ -351,7 +334,7 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                 st.divider()
 
                 st.markdown("### 📝 रासायनिक अभिक्रियांचे प्रकार ओळखण्याचा सराव (१ ते २०)")
-                st.info("💡 **विद्यार्थ्यांसाठी सूचना:** खालील सर्व २० रासायनिक अभिक्रियांचे काळजीपूर्वक निरीक्षण करा आणि योग्य पर्याय निवडून शेवटी **'सबमिट करा'** बटण दाबा. तुमची उत्तरे थेट शिक्षकांकडे मूल्यांकनासाठी जमा केली जातील.")
+                st.info("💡 **विद्यार्थ्यांसाठी सूचना:** खालील सर्व २० रासायनिक अभिक्रियांचे काळजीपूर्वक निरीक्षण करा आणि योग्य पर्याय निवडून शेवटी **'माझी सर्व उत्तरे शिक्षकांकडे जमा करा'** बटण दाबा. तुमची उत्तरे थेट शिक्षकांकडे मूल्यांकनासाठी जमा केली जातील.")
 
                 # Student Form - Single Column Layout for 20 Reactions
                 with st.form("reactions_practice_form"):
@@ -376,7 +359,7 @@ elif selected_page == "📚 शालेय अभ्यासक्रम (Subj
                     submit_reactions = st.form_submit_button("📤 माझी सर्व उत्तरे शिक्षकांकडे जमा करा (Submit Test)", use_container_width=True, type="primary")
 
                 if submit_reactions:
-                    # Evaluate score in background without revealing answers
+                    # Evaluate score in background without revealing answers to students
                     score = 0
                     detailed_breakdown = []
                     
@@ -490,7 +473,6 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
     st.header("📊 शिक्षक नियंत्रण कक्ष (Teacher Admin Dashboard)")
     st.write("विद्यार्थ्यांची उपस्थिती, लॉगिन रेकॉर्ड, रासायनिक अभिक्रियांचे निकाल व गुणांचे सविस्तर विश्लेषण.")
 
-    # Password Protection for Teacher (Default password text removed)
     teacher_password = st.text_input("🔑 शिक्षकांचा गुप्त पासवर्ड टाका (Teacher PIN):", type="password")
     
     if teacher_password == "gurukul123":
@@ -534,7 +516,7 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
         tab_dash1, tab_dash2, tab_dash3 = st.tabs([
             "📋 विद्यार्थी हजेरी व लॉगिन (Logs)", 
             "🧪 रासायनिक अभिक्रिया निकाल व उत्तरे (Test Results)",
-            "📬 आलेल्या शंका & वर्ग कोड व्यवस्थापन (Doubts & Settings)"
+            "⚙️ वर्ग कोड व शंका व्यवस्थापन (Settings & Doubts)"
         ])
 
         with tab_dash1:
@@ -581,7 +563,6 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
                 df_details = pd.DataFrame(selected_sub["तपशील"])
                 st.dataframe(df_details[["अभिक्रिया क्र", "विद्यार्थ्याचे उत्तर", "योग्य उत्तर", "निकाल"]], use_container_width=True)
 
-                # चाचणी निकाल CSV डाऊनलोड
                 csv_sub = df_results.to_csv(index=False).encode('utf-8')
                 st.download_button(
                     label="📥 रासायनिक अभिक्रिया निकाल डाऊनलोड करा (Download CSV)",
@@ -593,16 +574,8 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
                 st.info("अद्याप कोणत्याही विद्यार्थ्याने रासायनिक अभिक्रिया चाचणी सबमिट केलेली नाही.")
 
         with tab_dash3:
-            st.subheader("विद्यार्थ्यांनी विचारलेल्या शंकांचे व्यवस्थापन")
-            if st.session_state.doubt_records:
-                df_doubts = pd.DataFrame(st.session_state.doubt_records)
-                st.dataframe(df_doubts, use_container_width=True)
-            else:
-                st.info("अद्याप कोणत्याही विद्यार्थ्याची शंका आलेली नाही.")
-
-            st.divider()
-            st.subheader("⚙️ विद्यार्थ्यांसाठी वर्ग कोड (Class Code) व्यवस्थापन")
-            st.write("विद्यार्थ्यांना लॉगिन करताना लागणारा कोड तुम्ही येथून बदलू शकता:")
+            st.subheader("⚙️ विद्यार्थ्यांसाठी वर्ग प्रवेश कोड (Class Access Code)")
+            st.write("विद्यार्थ्यांना अभ्यासक्रमात प्रवेश करण्यासाठी लागणारा कोड तुम्ही येथून बदलू शकता:")
             
             new_code = st.text_input("सध्याचा चालू कोड:", value=st.session_state.class_access_code)
             if st.button("💾 नवीन कोड सेव्ह करा", key="save_code_btn"):
@@ -612,6 +585,14 @@ elif selected_page == "📊 शिक्षक डॅशबोर्ड (Teacher
                     st.rerun()
                 else:
                     st.error("कोड रिकामा ठेवू नका.")
+
+            st.divider()
+            st.subheader("📬 विद्यार्थ्यांच्या शंका")
+            if st.session_state.doubt_records:
+                df_doubts = pd.DataFrame(st.session_state.doubt_records)
+                st.dataframe(df_doubts, use_container_width=True)
+            else:
+                st.info("अद्याप कोणत्याही विद्यार्थ्याची शंका आलेली नाही.")
 
     elif teacher_password != "":
         st.error("चुकीचा पासवर्ड! कृपया योग्य पासवर्ड टाका.")
